@@ -1,0 +1,111 @@
+import { EnhancedMorph } from '../morphDatabase';
+
+export const SPECIAL_PROJECTS: EnhancedMorph[] = [
+  {
+    id: 'lemon-frost',
+    name: 'Lemon Frost',
+    description: 'Genetik warna kuning neon ekstrem hasil mutasi spontan.',
+    visual_description: 'Kuning berpendar dengan mata keputihan.',
+    genetic_type: 'dominant',
+    traits: ['Neon Yellow'],
+    compatible_combos: ['Black Night'],
+    genetic_issues: ['Iridophoroma (Tumor risk)'],
+    rarity_tier: 'Rare',
+    market_demand: 'Low',
+    difficulty_level: 'Expert',
+    category: 'Special'
+  },
+  {
+    id: 'enigma',
+    name: 'Enigma',
+    description: 'Mutasi pola bintik halus yang memiliki risiko gangguan neurologis.',
+    visual_description: 'Bintik tidak beraturan dengan ekor yang cenderung putih bersih.',
+    genetic_type: 'dominant',
+    traits: ['Random Patterning'],
+    compatible_combos: ['Nova', 'Dreamsicle'],
+    genetic_issues: ['Enigma Syndrome (Neurological)'],
+    rarity_tier: 'Rare',
+    market_demand: 'Moderate',
+    difficulty_level: 'Expert',
+    category: 'Special'
+  },
+  {
+    id: 'bee',
+    name: 'Black Eyes Enigma (BEE)',
+    description: 'Enigma + Eclipse combo yang menghasilkan mata hitam solid.',
+    visual_description: 'Pola acak Enigma dengan mata hitam pekat.',
+    genetic_type: 'recessive',
+    traits: ['Eclipse', 'Enigma'],
+    compatible_combos: ['Black Hole'],
+    genetic_issues: ['Enigma Syndrome risk'],
+    rarity_tier: 'Rare',
+    market_demand: 'High',
+    difficulty_level: 'Expert',
+    category: 'Special'
+  },
+  {
+    id: 'paradox',
+    name: 'Paradox',
+    description: 'Bukan genetik yang bisa diturunkan, tapi anomali pewarnaan.',
+    visual_description: 'Munculnya bercak warna yang tidak seharusnya ada (misal bintik hitam pada Blizzard).',
+    genetic_type: 'polygenic',
+    traits: ['Color Anomaly'],
+    compatible_combos: ['None'],
+    rarity_tier: 'Legendary',
+    market_demand: 'Extreme',
+    difficulty_level: 'Beginner',
+    category: 'Special'
+  },
+  {
+    id: 'marble-eye',
+    name: 'Marble Eye',
+    description: 'Mutasi pada mata yang memberikan efek seperti kelereng.',
+    visual_description: 'Mata dengan corak yang sangat kompleks dan tidak beraturan.',
+    genetic_type: 'recessive',
+    traits: ['Marble Eye Effect'],
+    compatible_combos: ['None'],
+    rarity_tier: 'Rare',
+    market_demand: 'Moderate',
+    difficulty_level: 'Intermediate',
+    category: 'Special'
+  },
+  {
+    id: 'black-pearl',
+    name: 'Black Pearl',
+    description: 'Genetik yang menghasilkan warna tubuh sangat gelap.',
+    visual_description: 'Hampir seluruh tubuh berwarna hitam pekat melalui seleksi breeding.',
+    genetic_type: 'polygenic',
+    traits: ['Extreme Melanism'],
+    compatible_combos: ['Black Night'],
+    rarity_tier: 'Legendary',
+    market_demand: 'High',
+    difficulty_level: 'Advanced',
+    category: 'Special'
+  },
+  {
+    id: 'cyclone',
+    name: 'Cyclone',
+    description: 'Kombinasi genetik tertentu yang menghasilkan pola pusaran.',
+    visual_description: 'Pola bintik yang memutar atau melingkar unik.',
+    genetic_type: 'recessive',
+    traits: ['Spiral Pattern'],
+    compatible_combos: ['Typhoon'],
+    rarity_tier: 'Rare',
+    market_demand: 'Moderate',
+    difficulty_level: 'Advanced',
+    category: 'Special'
+  },
+  {
+    id: 'universe',
+    name: 'Universe',
+    description: 'White & Yellow + Mack Snow + Eclipse.',
+    visual_description: 'Warna putih dengan bintik halus yang menyerupai bintang di galaksi.',
+    genetic_type: 'recessive',
+    traits: ['Snow', 'W&Y', 'Eclipse'],
+    compatible_combos: ['Super Snow'],
+    rarity_tier: 'Legendary',
+    market_demand: 'Very High',
+    difficulty_level: 'Advanced',
+    category: 'Special'
+  }
+];

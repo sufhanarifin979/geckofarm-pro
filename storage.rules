@@ -1,0 +1,25 @@
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Helper to check if user is authenticated and is the owner
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    // Gecko images: Public read (for QR/Registry), Owner write
+    match /geckos/{userId}/{geckoId}/{allPaths=**} {
+      allow read: if true;
+      allow write, delete: if isOwner(userId);
+    }
+
+    // User Farm photos: Public read, Owner write
+    match /users/{userId}/{allPaths=**} {
+      allow read: if true;
+      allow write, delete: if isOwner(userId);
+    }
+    
+    // Default deny
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

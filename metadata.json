@@ -1,0 +1,14 @@
+{
+  "name": "Gecko Farm Pro",
+  "description": "Professional Leopard Gecko Management System with Pedigree Tracking, Breeding Logs, and ID Label Generation.",
+  "requestFramePermissions": [
+    "camera",
+    "geolocation"
+  ],
+  "majorCapabilities": [
+    "data_storage",
+    "user_authentication",
+    "image_generation",
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

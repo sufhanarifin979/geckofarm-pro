@@ -1,0 +1,363 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --color-primary: #10b981;
+  --color-primary-dark: #059669;
+  --color-sidebar: #0f172a;
+  --color-sidebar-hover: #1e293b;
+  --color-bg-main: #f8fafc;
+  --color-text-main: #334155;
+  --color-text-muted: #64748b;
+  --color-sidebar-text: #94a3b8;
+
+  /* HEX Fallbacks for html2canvas (Tailwind 4 uses oklch by default) */
+  --color-slate-50: #f8fafc;
+  --color-slate-100: #f1f5f9;
+  --color-slate-200: #e2e8f0;
+  --color-slate-300: #cbd5e1;
+  --color-slate-400: #94a3b8;
+  --color-slate-500: #64748b;
+  --color-slate-600: #475569;
+  --color-slate-700: #334155;
+  --color-slate-800: #1e293b;
+  --color-slate-900: #0f172a;
+  --color-slate-950: #020617;
+
+  --color-emerald-50: #ecfdf5;
+  --color-emerald-100: #d1fae5;
+  --color-emerald-500: #10b981;
+  --color-emerald-600: #059669;
+
+  --color-blue-50: #eff6ff;
+  --color-blue-100: #dbeafe;
+  --color-blue-500: #3b82f6;
+  --color-blue-600: #2563eb;
+
+  --color-rose-50: #fff1f2;
+  --color-rose-100: #ffe4e6;
+  --color-rose-500: #f43f5e;
+  --color-rose-600: #e11d48;
+
+  --color-green-50: #f0fdf4;
+  --color-green-400: #4ade80;
+  --color-green-500: #22c55e;
+  --color-green-600: #16a34a;
+
+  --color-slate-50: #f8fafc;
+  --color-slate-100: #f1f5f9;
+  --color-slate-200: #e2e8f0;
+  --color-slate-300: #cbd5e1;
+  --color-slate-400: #94a3b8;
+  --color-slate-500: #64748b;
+  --color-slate-600: #475569;
+  --color-slate-700: #334155;
+  --color-slate-800: #1e293b;
+  --color-slate-900: #0f172a;
+  --color-slate-950: #020617;
+
+  --color-emerald-50: #ecfdf5;
+  --color-emerald-500: #10b981;
+  --color-emerald-600: #059669;
+
+  --color-blue-50: #eff6ff;
+  --color-blue-100: #dbeafe;
+  --color-blue-500: #3b82f6;
+  --color-blue-600: #2563eb;
+
+  --color-rose-50: #fff1f2;
+  --color-rose-100: #ffe4e6;
+  --color-rose-500: #f43f5e;
+  --color-rose-600: #e11d48;
+
+  --color-amber-50: #fffbeb;
+  --color-amber-100: #fef3c7;
+  --color-amber-500: #f59e0b;
+  --color-amber-600: #d97706;
+  --color-amber-700: #b45309;
+  --color-amber-800: #92400e;
+
+  --color-pink-500: #ec4899;
+  --color-pink-600: #db2777;
+
+  --color-red-50: #fef2f2;
+  --color-red-600: #dc2626;
+
+  --color-green-50: #f0fdf4;
+  --color-green-100: #dcfce7;
+  --color-green-200: #bbf7d0;
+  --color-green-300: #86efac;
+  --color-green-400: #4ade80;
+  --color-green-500: #22c55e;
+  --color-green-600: #16a34a;
+
+  --color-emerald-100: #d1fae5;
+  --color-emerald-200: #a7f3d0;
+  --color-emerald-300: #6ee7b7;
+  --color-emerald-400: #34d399;
+
+  --color-zinc-50: #fafafa;
+  --color-zinc-100: #f4f4f5;
+  --color-zinc-200: #e4e4e7;
+  --color-zinc-300: #d4d4d8;
+  --color-zinc-400: #a1a1aa;
+  --color-zinc-500: #71717a;
+  --color-zinc-600: #52525b;
+  --color-zinc-700: #3f3f46;
+  --color-zinc-800: #27272a;
+  --color-zinc-900: #18181b;
+  --color-zinc-950: #09090b;
+
+  /* Force sRGB color space globally for html2canvas compatibility */
+  --tw-gradient-from-position: 0% !important;
+  --tw-gradient-to-position: 100% !important;
+  
+  /* Additional HEX overrides for common Tailwind utilities that might use oklch */
+  --color-white: #ffffff !important;
+  --color-black: #000000 !important;
+  --color-transparent: transparent !important;
+  --color-current: currentColor !important;
+  --color-inherit: inherit !important;
+
+  /* Explicitly define standard gray colors to avoid oklch defaults */
+  --color-slate-50: #f8fafc !important;
+  --color-slate-100: #f1f5f9 !important;
+  --color-slate-200: #e2e8f0 !important;
+  --color-slate-300: #cbd5e1 !important;
+  --color-slate-400: #94a3b8 !important;
+  --color-slate-500: #64748b !important;
+  --color-slate-600: #475569 !important;
+  --color-slate-700: #334155 !important;
+  --color-slate-800: #1e293b !important;
+  --color-slate-900: #0f172a !important;
+
+  /* Force standard color spaces for gradients */
+  --tw-gradient-from: #ffffff !important;
+  --tw-gradient-to: #ffffff !important;
+  --tw-gradient-stops: #ffffff, #ffffff !important;
+}
+
+:root {
+  color-scheme: light !important;
+  color-interpolation: sRGB !important;
+  color-interpolation-filters: sRGB !important;
+  /* Disable oklab/oklch as much as possible for rendering points */
+  forced-color-adjust: none !important;
+}
+
+@layer base {
+  *, ::before, ::after {
+    /* Override Tailwind 4's default oklch/oklab variables with safe RGB/HEX versions */
+    --tw-ring-color: rgba(59, 130, 246, 0.5) !important;
+    --tw-shadow-color: rgba(0, 0, 0, 0.1) !important;
+    --tw-ring-offset-color: #ffffff !important;
+    --tw-border-opacity: 1 !important;
+    --tw-text-opacity: 1 !important;
+    --tw-bg-opacity: 1 !important;
+    
+    /* Force simple shadow values to avoid oklch-based shadow variables in TW4 */
+    --tw-shadow: 0 0 transparent !important;
+    --tw-shadow-colored: 0 0 transparent !important;
+  }
+}
+
+body {
+  background-color: var(--color-bg-main);
+  color: var(--color-text-main);
+  font-family: var(--font-sans);
+  margin: 0;
+  overflow: hidden;
+  height: 100vh;
+  height: 100dvh;
+  min-height: -webkit-fill-available;
+}
+
+@layer components {
+  .dashboard-grid {
+    display: flex;
+    height: 100vh;
+    height: 100dvh;
+    min-height: -webkit-fill-available;
+    width: 100vw;
+    overflow: hidden;
+    background: var(--color-bg-main);
+  }
+
+  .sidebar {
+    background: var(--color-sidebar);
+    color: white;
+    display: flex;
+    flex-direction: column;
+    padding: 1rem;
+    box-sizing: border-box;
+    height: 100%;
+    z-index: 50;
+    flex-shrink: 0;
+    position: relative;
+  }
+
+  .main-content {
+    flex: 1;
+    padding: 1rem;
+    padding-top: calc(1rem + env(safe-area-inset-top));
+    padding-bottom: calc(6rem + env(safe-area-inset-bottom));
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    box-sizing: border-box;
+    overflow-y: auto;
+    height: 100%;
+    background: var(--color-bg-main);
+    min-width: 0;
+  }
+
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #e2e8f0;
+    border-radius: 10px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #cbd5e1;
+  }
+
+  .nav-item {
+    display: flex;
+    align-items: center;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.375rem;
+    margin-bottom: 0.125rem;
+    font-size: 0.8125rem;
+    cursor: pointer;
+    transition: background 0.2s;
+    color: rgba(255, 255, 255, 0.7);
+  }
+
+  .nav-item.active {
+    background: var(--color-primary);
+    color: white;
+  }
+
+  .nav-item:hover:not(.active) {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+  }
+
+  .stat-card {
+    background: white;
+    border-radius: 0.625rem;
+    padding: 0.75rem 1rem;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  }
+
+  .badge {
+    padding: 0.25rem 0.625rem;
+    border-radius: 1.25rem;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  .badge-premium {
+    background: #fef3c7;
+    color: #92400e;
+    border: 1px solid #fcd34d;
+  }
+
+  .registry-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .registry-table th {
+    text-align: left;
+    padding: 0.75rem;
+    font-size: 0.75rem;
+    color: #64748b;
+    border-bottom: 1px solid #e2e8f0;
+  }
+
+  .registry-table td {
+    padding: 0.75rem;
+    font-size: 0.875rem;
+    border-bottom: 1px solid #f1f5f9;
+  }
+
+  .id-card-preview {
+    background: #fff;
+    border: 1px dashed #cbd5e1;
+    border-radius: 12px;
+    height: 200px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .id-card-content {
+    width: 180px;
+    height: 120px;
+    border: 1px solid #000;
+    padding: 8px;
+    font-size: 8px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+    background: white;
+  }
+
+  .lock-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(2px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 600;
+    color: #475569;
+  }
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.animate-shimmer {
+  animation: shimmer 5s infinite linear;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.animate-blink {
+  animation: blink 0.8s ease-in-out infinite;
+}

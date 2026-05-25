@@ -1,0 +1,16 @@
+{
+  "short_name": "Geckofarm",
+  "name": "Geckofarm Pro - Breeding Registry",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/2809/2809795.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#0f172a",
+  "background_color": "#ffffff"
+}

@@ -1,0 +1,184 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- III. Primitives & Helpers ---
+    function isSignedIn() { return request.auth != null; }
+    function isVerified() { return isSignedIn() && request.auth.token.email_verified == true; }
+    function isOwner(uid) { return isSignedIn() && request.auth.uid == uid; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    
+    function isAdmin() { 
+      return isSignedIn() && (
+        request.auth.token.email == 'sufhan.arifin979@gmail.com' && 
+        request.auth.token.email_verified == true
+      ); 
+    }
+
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+
+    function getUserData(uid) {
+      return get(/databases/$(database)/documents/users/$(uid)).data;
+    }
+
+    // --- USER PROFILE RULES ---
+    match /users/{userId} {
+      function isValidUser(data) {
+        return data.keys().hasAll(['email', 'farmName', 'subscription', 'planLimit', 'geckoCount', 'pairingCount', 'clutchCount']) &&
+               data.email is string && data.email.size() <= 256 &&
+               data.farmName is string && data.farmName.size() <= 100 &&
+               data.subscription in ['free', 'premium'] &&
+               data.planLimit is int && data.planLimit >= 0 &&
+               data.geckoCount is int && data.geckoCount >= 0 &&
+               data.pairingCount is int && data.pairingCount >= 0 &&
+               data.clutchCount is int && data.clutchCount >= 0 &&
+               (data.get('farmPhotoUrl', '') is string && data.get('farmPhotoUrl', '').size() <= 2000000);
+      }
+
+      allow get: if userId is string;
+      allow list: if isAdmin();
+
+      allow create: if isValidId(userId) && isValidUser(incoming()) && (
+        (isOwner(userId) && incoming().subscription == 'free' && incoming().planLimit <= 10) ||
+        isAdmin()
+      );
+
+      allow update: if isValidId(userId) && isValidUser(incoming()) && (
+        (isOwner(userId) && incoming().subscription == existing().subscription && incoming().planLimit == existing().planLimit) ||
+        isAdmin()
+      );
+    }
+
+    // --- GECKO RULES ---
+    match /geckos/{geckoId} {
+      function isValidGecko(data) {
+        return data.keys().hasAll(['name', 'morph', 'gender', 'status', 'ownerId']) &&
+               data.ownerId == request.auth.uid &&
+               data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+               data.morph is string && data.morph.size() <= 1000 &&
+               data.gender in ['male', 'female', 'unsex'] &&
+               data.status in ['available', 'sold', 'dead', 'keep'] &&
+               (data.get('info', '') is string && data.get('info', '').size() <= 5000) &&
+               (data.get('note', '') is string && data.get('note', '').size() <= 5000) &&
+               (data.get('photoUrl', '') is string && data.get('photoUrl', '').size() <= 2000000); // Base64 can be large
+      }
+
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow get: if geckoId is string;
+
+      allow create: if isValidId(geckoId) && isSignedIn() && isValidGecko(incoming()) && (
+        getUserData(request.auth.uid).subscription == 'premium' || 
+        getUserData(request.auth.uid).geckoCount < getUserData(request.auth.uid).planLimit
+      );
+
+      allow update: if isValidId(geckoId) && isSignedIn() && isValidGecko(incoming()) && (
+        (existing().ownerId == request.auth.uid && incoming().ownerId == existing().ownerId) ||
+        isAdmin()
+      );
+
+      allow delete: if isValidId(geckoId) && isSignedIn() && (existing().ownerId == request.auth.uid || isAdmin());
+
+      // Nested Subcollections
+      match /weight_history/{logId} {
+        function isValidWeight(data) {
+          return data.weight is number && data.weight >= 0 &&
+                 data.date is string && 
+                 (data.get('note', '') is string && data.get('note', '').size() <= 1000);
+        }
+        allow list: if isSignedIn() && (get(/databases/$(database)/documents/geckos/$(geckoId)).data.ownerId == request.auth.uid || isAdmin());
+        allow get: if isValidId(logId) && isSignedIn() && (get(/databases/$(database)/documents/geckos/$(geckoId)).data.ownerId == request.auth.uid || isAdmin());
+        allow create, update: if isValidId(logId) && isSignedIn() && isValidWeight(incoming()) && (get(/databases/$(database)/documents/geckos/$(geckoId)).data.ownerId == request.auth.uid || isAdmin());
+        allow delete: if isValidId(logId) && isSignedIn() && (get(/databases/$(database)/documents/geckos/$(geckoId)).data.ownerId == request.auth.uid || isAdmin());
+      }
+
+      match /activity_logs/{logId} {
+        function isValidLog(data) {
+          return data.type in ['feeding', 'shedding', 'health', 'note'] &&
+                 data.date is string &&
+                 (data.get('description', '') is string && data.get('description', '').size() <= 2000);
+        }
+        allow list: if isSignedIn() && (get(/databases/$(database)/documents/geckos/$(geckoId)).data.ownerId == request.auth.uid || isAdmin());
+        allow get: if isValidId(logId) && isSignedIn() && (get(/databases/$(database)/documents/geckos/$(geckoId)).data.ownerId == request.auth.uid || isAdmin());
+        allow create, update: if isValidId(logId) && isSignedIn() && isValidLog(incoming()) && (get(/databases/$(database)/documents/geckos/$(geckoId)).data.ownerId == request.auth.uid || isAdmin());
+        allow delete: if isValidId(logId) && isSignedIn() && (get(/databases/$(database)/documents/geckos/$(geckoId)).data.ownerId == request.auth.uid || isAdmin());
+      }
+    }
+
+    // --- PAIRING RULES ---
+    match /pairings/{pairingId} {
+      function isValidPairing(data) {
+        return data.keys().hasAll(['sireId', 'damId', 'pairingDate', 'ownerId', 'clutchCount']) &&
+               data.ownerId == request.auth.uid &&
+               data.sireId is string && data.damId is string &&
+               data.pairingDate is string &&
+               data.clutchCount is int && data.clutchCount >= 0 &&
+               (data.get('sireName', '') is string) &&
+               (data.get('damName', '') is string);
+      }
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow get: if isValidId(pairingId) && isSignedIn() && (resource.data.ownerId == request.auth.uid || isAdmin());
+      allow create: if isValidId(pairingId) && isSignedIn() && isValidPairing(incoming());
+      allow update: if isValidId(pairingId) && isSignedIn() && (existing().ownerId == request.auth.uid && incoming().ownerId == existing().ownerId) && isValidPairing(incoming());
+      allow delete: if isValidId(pairingId) && isSignedIn() && (existing().ownerId == request.auth.uid || isAdmin());
+    }
+
+    // --- CLUTCH RULES ---
+    match /clutches/{clutchId} {
+      function isValidClutch(data) {
+        return data.keys().hasAll(['pairingId', 'clutchNumber', 'layDate', 'ownerId', 'eggCount', 'hatchedCount']) &&
+               data.ownerId == request.auth.uid &&
+               data.pairingId is string &&
+               data.clutchNumber is int &&
+               data.layDate is string &&
+               data.eggCount is int && data.eggCount >= 0 &&
+               data.hatchedCount is int && data.hatchedCount >= 0 &&
+               (data.get('hatchDate', '') is string);
+      }
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow get: if isValidId(clutchId) && isSignedIn() && (resource.data.ownerId == request.auth.uid || isAdmin());
+      allow create: if isValidId(clutchId) && isSignedIn() && isValidClutch(incoming()) && exists(/databases/$(database)/documents/pairings/$(incoming().pairingId));
+      allow update: if isValidId(clutchId) && isSignedIn() && (existing().ownerId == request.auth.uid && incoming().ownerId == existing().ownerId) && isValidClutch(incoming());
+      allow delete: if isValidId(clutchId) && isSignedIn() && (existing().ownerId == request.auth.uid || isAdmin());
+    }
+
+    // --- MORPH RULES ---
+    match /morphs/{morphId} {
+      function isValidMorph(data) {
+        return data.keys().hasAll(['name', 'slug', 'category', 'rarity', 'inheritance_type']) &&
+               data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+               data.slug is string && data.slug.size() > 0 && data.slug.size() <= 100 &&
+               data.category in ['Base', 'Albino', 'Snow', 'Combo', 'Line-bred', 'Pattern', 'Special'] &&
+               data.rarity in ['Common', 'Uncommon', 'Rare', 'Legendary', 'Holy Grail'] &&
+               data.inheritance_type in ['Recessive', 'Incomplete Dominant', 'Dominant', 'Polygenetic', 'Line-bred'] &&
+               (data.get('description', '') is string && data.get('description', '').size() <= 10000) &&
+               (data.get('genetics', '') is string && data.get('genetics', '').size() <= 200) &&
+               (data.get('visual_traits', []) is list) &&
+               (data.get('combo_compatibility', []) is list) &&
+               (data.get('warnings', '') is string && data.get('warnings', '').size() <= 5000) &&
+               (data.get('breeder_notes', '') is string && data.get('breeder_notes', '').size() <= 10000) &&
+               (data.get('image_url', '') is string && data.get('image_url', '').size() <= 2000000) &&
+               (data.get('tags', []) is list) &&
+               (data.get('reference_links', []) is list) &&
+               (data.get('credited_breeders', []) is list);
+      }
+      allow get, list: if true; 
+      allow create, update: if isAdmin() && isValidMorph(incoming());
+      allow delete: if isAdmin();
+    }
+
+    match /morph_relations/{relationId} {
+      function isValidRelation(data) {
+        return data.keys().hasAll(['morph_id', 'related_id']) &&
+               data.morph_id is string && data.related_id is string;
+      }
+      allow get, list: if true;
+      allow create, update: if isAdmin() && isValidRelation(incoming());
+      allow delete: if isAdmin();
+    }
+  }
+}

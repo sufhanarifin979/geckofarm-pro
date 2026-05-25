@@ -1,0 +1,45 @@
+{
+  "entities": {
+    "Morph": {
+      "title": "Morph Encyclopedia Entry",
+      "description": "Comprehensive data for a leopard gecko morph or combo.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Display name of the morph" },
+        "slug": { "type": "string", "description": "URL-friendly identifier" },
+        "category": { "type": "string", "enum": ["Base", "Albino", "Snow", "Combo", "Line-bred", "Pattern", "Special"] },
+        "rarity": { "type": "string", "enum": ["Common", "Uncommon", "Rare", "Legendary", "Holy Grail"] },
+        "description": { "type": "string" },
+        "genetics": { "type": "string", "description": "Concise genetic formula (e.g., bb/ee)" },
+        "inheritance_type": { "type": "string", "enum": ["Recessive", "Incomplete Dominant", "Dominant", "Polygenetic", "Line-bred"] },
+        "visual_traits": { "type": "array", "items": { "type": "string" } },
+        "combo_compatibility": { "type": "array", "items": { "type": "string" } },
+        "warnings": { "type": "string" },
+        "breeder_notes": { "type": "string" },
+        "image_url": { "type": "string" },
+        "selection_priority": { "type": "array", "items": { "type": "string" }, "description": "Breeder grading guide / visual selection guide points" },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "reference_links": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": { "type": "string" },
+              "url": { "type": "string" }
+            }
+          }
+        },
+        "credited_breeders": { "type": "array", "items": { "type": "string" } },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "slug", "category", "rarity", "inheritance_type"]
+    }
+  },
+  "firestore": {
+    "morphs/{morphId}": {
+      "schema": "Morph",
+      "description": "Collection of morph research data"
+    }
+  }
+}

@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <link rel="icon" type="image/png" href="https://i.ibb.co.com/CKYFsmQx/geckofarm-logo.png" />
+    <link rel="manifest" href="/manifest.json" />
+    <title>Gecko Farm Pro</title>
+    <script>
+      window.onerror = function(message, source, lineno, colno, error) {
+        var root = document.getElementById('root');
+        if (root) {
+          root.innerHTML = '<div style="padding: 20px; color: #ef4444; font-family: sans-serif;">' +
+            '<h1 style="font-size: 1.5rem; font-weight: bold;">Initial Load Error</h1>' +
+            '<pre style="margin-top: 10px; padding: 10px; background: #fee2e2; border-radius: 8px; overflow: auto;">' + 
+            (error ? error.stack : message) + '</pre>' +
+            '</div>';
+        }
+        return false;
+      };
+    </script>
+  </head>
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root">
+      <div style="display: flex; align-items: center; justify-content: center; min-height: 100vh; font-family: sans-serif; color: #64748b;">
+        <div style="text-align: center;">
+          <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 0.5rem;">Gecko Farm Pro</h2>
+          <p style="font-size: 0.875rem;">Loading application resources...</p>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+
