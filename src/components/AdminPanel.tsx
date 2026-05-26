@@ -191,7 +191,6 @@ export default function AdminPanel() {
                   <AnimatePresence mode="popLayout">
                     {filteredProfiles.map((p) => (
                       <motion.tr 
-                        layout
                         key={p.uid} 
                         className="hover:bg-slate-50/50 dark:hover:bg-slate-800/10 transition-colors"
                       >

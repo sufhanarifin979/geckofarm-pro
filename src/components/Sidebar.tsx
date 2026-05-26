@@ -135,7 +135,7 @@ export default function Sidebar({
                   <span className="text-slate-100 font-bold text-sm tracking-tight whitespace-nowrap leading-none">
                     Gecko Farm <span className="text-emerald-500 font-black ml-0.5">PRO</span>
                   </span>
-                  <span className="text-[8px] text-slate-500 font-bold uppercase tracking-[0.2em] mt-1">SaaS Management</span>
+                  <span className="text-[8px] text-slate-500 font-bold uppercase tracking-[0.2em] mt-1">Farm Management</span>
                 </motion.div>
               )}
             </div>

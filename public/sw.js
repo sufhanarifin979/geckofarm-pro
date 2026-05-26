@@ -1,31 +1,21 @@
 /* eslint-disable no-restricted-globals */
 /* eslint-disable */
-const CACHE_NAME = 'geckofarm-v1';
-const urlsToCache = [
-  '/',
-  '/index.html'
-];
-
 self.addEventListener('install', event => {
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(urlsToCache))
+    caches.keys().then(cacheNames => {
+      return Promise.all(
+        cacheNames.map(cacheName => caches.delete(cacheName))
+      );
+    }).then(() => self.clients.claim())
   );
 });
 
 self.addEventListener('fetch', event => {
-  // Ignore API requests - let them go straight to the network
-  if (event.request.url.includes('/api/')) {
-    return;
-  }
-
-  event.respondWith(
-    caches.match(event.request)
-      .then(response => {
-        if (response) {
-          return response;
-        }
-        return fetch(event.request);
-      })
-  );
+  // Do not intercept or cache any requests, bypass straight to network
+  return;
 });
+

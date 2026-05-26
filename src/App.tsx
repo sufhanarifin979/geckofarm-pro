@@ -256,7 +256,7 @@ export default function App() {
                         <Route path="/" element={<Dashboard profile={profile} />} />
                         <Route path="/registry" element={<Registry profile={profile} setProfile={setProfile} />} />
                         <Route path="/breeding" element={<Breeding profile={profile} />} />
-                        <Route path="/incubator" element={<Incubator profile={profile} />} />
+                        <Route path="/incubator" element={<Incubator profile={profile} setProfile={setProfile} />} />
                         <Route path="/knowledge" element={<Knowledge profile={profile} />} />
                         <Route path="/knowledge/:id" element={<Knowledge profile={profile} />} />
                         <Route path="/morph-calculator" element={<MorphCalculator profile={profile} />} />

@@ -15,12 +15,18 @@ import {
   Calendar,
   Plus,
   Activity,
-  ExternalLink
+  ExternalLink,
+  Camera,
+  Upload,
+  HelpCircle,
+  Mars as MaleIcon,
+  Venus as FemaleIcon
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Clutch, Pairing, UserProfile, Gecko } from '../types';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { collection, query, where, onSnapshot, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, updateDoc, writeBatch, serverTimestamp, increment } from 'firebase/firestore';
+import { autoCropToSquare, uploadGeckoImage } from '../lib/imageUtils';
 import { cn, formatDate } from '../lib/utils';
 import { differenceInDays, addDays, format, isAfter, isBefore } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
@@ -28,9 +34,10 @@ import { useGeckos } from '../GeckoProvider';
 
 interface IncubatorProps {
   profile: UserProfile | null;
+  setProfile?: React.Dispatch<React.SetStateAction<UserProfile | null>>;
 }
 
-export default function Incubator({ profile }: IncubatorProps) {
+export default function Incubator({ profile, setProfile }: IncubatorProps) {
   const navigate = useNavigate();
   const { geckos } = useGeckos();
   const [clutches, setClutches] = useState<Clutch[]>([]);
@@ -45,6 +52,28 @@ export default function Incubator({ profile }: IncubatorProps) {
 
   // Toast System
   const [toasts, setToasts] = useState<{ id: string; message: string; type: 'success' | 'error' }[]>([]);
+
+  // Registry Popup state for Hatch & Register Gecko workflow
+  const [isRegisterGeckoModalOpen, setIsRegisterGeckoModalOpen] = useState(false);
+  const [formData, setFormData] = useState<Partial<Gecko>>({
+    name: '',
+    morph: '',
+    birthDate: '',
+    gender: 'unsex',
+    status: 'available',
+    albinoStrain: 'None',
+    sireId: '',
+    damId: '',
+    sireName: '',
+    damName: '',
+    info: '',
+    note: '',
+    photoUrl: ''
+  });
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [imgSrc, setImgSrc] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   const addToast = (message: string, type: 'success' | 'error' = 'success') => {
     const id = Math.random().toString(36).substr(2, 9);
@@ -145,44 +174,127 @@ export default function Incubator({ profile }: IncubatorProps) {
     }
   };
 
-  const handleHatchAndRegister = async (clutch: Clutch) => {
-    const nextCount = clutch.hatchedCount + 1;
-    const totalProcessed = nextCount + (clutch.failedCount || 0);
-    if (totalProcessed > clutch.eggCount) return;
+  const handleHatchAndRegister = (clutch: Clutch) => {
+    // 1. Prepare data for registration without saving anything to the DB yet!
+    const pairing = pairings.find(p => p.id === clutch.pairingId);
+    const sire = geckos.find(g => g.id === pairing?.sireId);
+    const dam = geckos.find(g => g.id === pairing?.damId);
+
+    const prefilledData: Partial<Gecko> = {
+      name: '',
+      morph: `${sire?.morph || ''} X ${dam?.morph || ''}`.trim().replace(/^ X | X $/g, '') || '',
+      birthDate: new Date().toISOString().split('T')[0],
+      gender: 'unsex',
+      status: 'available',
+      albinoStrain: 'None',
+      sireId: pairing?.sireId || '',
+      damId: pairing?.damId || '',
+      sireName: pairing?.sireName || '',
+      damName: pairing?.damName || '',
+      info: '',
+      note: `Hatched from Clutch #${clutch.clutchNumber} (${pairing?.sireName || 'Unknown'} x ${pairing?.damName || 'Unknown'})`,
+      photoUrl: ''
+    };
+
+    setFormData(prefilledData);
+    setImgSrc('');
+    setFormErrors({});
+    setIsRegisterGeckoModalOpen(true);
+    setIsHatchModalOpen(false); // Close the intermediate modal
+  };
+
+  const validateForm = () => {
+    const errors: Record<string, string> = {};
+    if (!formData.name?.trim()) errors.name = 'Name is required';
+    if (!formData.morph?.trim()) errors.morph = 'Morph is required';
+    if (!formData.gender) errors.gender = 'Gender is required';
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleRegisterGeckoSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!profile || !selectedClutch) return;
+
+    if (!validateForm()) {
+      return;
+    }
+
+    if (profile.geckoCount >= profile.planLimit) {
+      addToast("Registration quota exceeded. Upgrade to Premium for more slots.", "error");
+      return;
+    }
 
     setIsProcessing(true);
+    setIsUploading(true);
     try {
-      // 1. Update clutch first
+      let finalPhotoUrl = '';
+      if (imgSrc && imgSrc.startsWith('data:image')) {
+        finalPhotoUrl = await uploadGeckoImage(profile.uid, '', imgSrc, (progress) => {
+          setUploadProgress(progress);
+        });
+      }
+
+      const batch = writeBatch(db);
+      
+      // A. Setup new gecko document
+      const newGeckoRef = doc(collection(db, 'geckos'));
+      const newGeckoId = newGeckoRef.id;
+      const rawGeckoData = {
+        ...formData,
+        photoUrl: finalPhotoUrl,
+        ownerId: profile.uid,
+        createdAt: serverTimestamp(),
+        gecko_id: newGeckoId
+      };
+      
+      const finalGeckoData = Object.fromEntries(
+        Object.entries(rawGeckoData).filter(([key, value]) => value !== undefined && key !== 'id')
+      );
+      batch.set(newGeckoRef, finalGeckoData);
+      
+      // B. Update User Profile count
+      batch.update(doc(db, 'users', profile.uid), { geckoCount: increment(1) });
+
+      // C. Update Clutch (This is when it counts! "Yang dibatalkan tidak otomatis terhitung", so we ONLY update when they actually successfully registered!)
+      const nextCount = selectedClutch.hatchedCount + 1;
+      const totalProcessed = nextCount + (selectedClutch.failedCount || 0);
       const updateData: any = { hatchedCount: nextCount };
-      if (totalProcessed === clutch.eggCount) {
+      if (totalProcessed === selectedClutch.eggCount) {
         updateData.hatchDate = new Date().toISOString().split('T')[0];
       }
-      await updateDoc(doc(db, 'clutches', clutch.id!), updateData);
+      batch.update(doc(db, 'clutches', selectedClutch.id!), updateData);
 
-      // 2. Prepare data for registration
-      const pairing = pairings.find(p => p.id === clutch.pairingId);
-      const sire = geckos.find(g => g.id === pairing?.sireId);
-      const dam = geckos.find(g => g.id === pairing?.damId);
+      // Commit everything atomically in one go!
+      await batch.commit();
 
-      const prefilledData = {
-        birthDate: new Date().toISOString().split('T')[0],
-        sireId: pairing?.sireId || '',
-        damId: pairing?.damId || '',
-        sireName: pairing?.sireName || '',
-        damName: pairing?.damName || '',
-        morph: `${sire?.morph || ''} X ${dam?.morph || ''}`.trim().replace(/^ X | X $/g, '') || '',
-        note: `Hatched from Clutch #${clutch.clutchNumber} (${pairing?.sireName} x ${pairing?.damName})`
-      };
+      // D. Update local profile state if setProfile is provided
+      if (setProfile) {
+        setProfile(prev => prev ? { ...prev, geckoCount: prev.geckoCount + 1 } : null);
+      }
 
-      addToast("Penetasan berhasil dicatat!");
-      
-      // Navigate to registry with prefilled data
-      navigate('/registry', { state: { prefilledData, autoOpen: true } });
+      addToast("Penetasan berhasil dicatat & Gecko baru telah didaftarkan!");
+      setIsRegisterGeckoModalOpen(false);
+      setSelectedClutch(null);
     } catch (error) {
-      addToast("Gagal memproses data.", "error");
+      console.error("Error registering gecko and hatching:", error);
+      addToast("Gagal mendaftarkan gecko. Silakan coba lagi.", "error");
     } finally {
       setIsProcessing(false);
-      setIsHatchModalOpen(false);
+      setIsUploading(false);
+    }
+  };
+
+  const onSelectFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const reader = new FileReader();
+      reader.addEventListener('load', async () => {
+        const result = reader.result?.toString() || '';
+        const cropped = await autoCropToSquare(result);
+        setImgSrc(cropped);
+        setFormData(prev => ({ ...prev, photoUrl: cropped }));
+      });
+      reader.readAsDataURL(e.target.files[0]);
     }
   };
 
@@ -509,9 +621,301 @@ export default function Incubator({ profile }: IncubatorProps) {
               <div className="mt-6 flex items-start gap-3 bg-blue-50/50 p-4 rounded-2xl border border-blue-100">
                 <Info size={16} className="text-blue-500 shrink-0 mt-0.5" />
                 <p className="text-[10px] font-bold text-blue-600 leading-relaxed uppercase tracking-tight">
-                  "Hatch & Register" akan mengarahkan Anda ke form inventaris dengan data silsilah yang terisi otomatis.
+                  "Hatch & Register" akan secara langsung membuka formulir registrasi gecko baru di halaman ini tanpa berpindah tab.
                 </p>
               </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Inline Gecko Registration Modal */}
+      <AnimatePresence>
+        {isRegisterGeckoModalOpen && selectedClutch && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto">
+            <motion.div 
+               initial={{ opacity: 0 }} 
+               animate={{ opacity: 1 }} 
+               exit={{ opacity: 0 }}
+               className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+               onClick={() => {
+                 if (!isProcessing) {
+                   setIsRegisterGeckoModalOpen(false);
+                   setSelectedClutch(null);
+                 }
+               }}
+            />
+            <motion.div 
+               initial={{ opacity: 0, y: 20 }} 
+               animate={{ opacity: 1, y: 0 }} 
+               exit={{ opacity: 0, y: 20 }}
+               className="bg-white w-full max-w-4xl max-h-[92vh] rounded-[2.5rem] shadow-2xl relative overflow-hidden flex flex-col z-10"
+            >
+                <div className="p-6 sm:p-8 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0 z-30">
+                   <div>
+                     <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight uppercase">Hatch & Register Gecko</h2>
+                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Registrasi anakan baru dari Clutch #{selectedClutch.clutchNumber}</p>
+                   </div>
+                   <button 
+                     onClick={() => {
+                       setIsRegisterGeckoModalOpen(false);
+                       setSelectedClutch(null);
+                     }} 
+                     disabled={isProcessing}
+                     className="p-2 hover:bg-slate-50 rounded-full transition-colors"
+                   >
+                     <X size={24} className="text-slate-400" />
+                   </button>
+                </div>
+                
+                <div className="flex-1 overflow-y-auto p-5 sm:p-8 custom-scrollbar">
+                    <form id="gecko-inline-form" onSubmit={handleRegisterGeckoSubmit} className="grid grid-cols-1 lg:grid-cols-2 gap-8 sm:gap-12 pb-12">
+                        <div className="space-y-8">
+                            <div className="aspect-square bg-slate-50 rounded-[2.5rem] border-2 border-dashed border-slate-200 flex flex-col items-center justify-center relative overflow-hidden group">
+                                {imgSrc ? (
+                                    <div className="relative w-full h-full">
+                                        <img 
+                                            src={imgSrc} 
+                                            className="w-full h-full object-cover" 
+                                            referrerPolicy="no-referrer"
+                                        />
+                                        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
+                                            <label className="px-4 py-2 bg-black/60 backdrop-blur-md text-white text-[10px] font-black uppercase tracking-wider rounded-lg border border-white/20 cursor-pointer hover:bg-black/80 transition-all flex items-center gap-2">
+                                                <Upload size={12} />
+                                                Ganti Foto
+                                                <input type="file" className="hidden" accept="image/*" onChange={onSelectFile} disabled={isProcessing} />
+                                            </label>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <label className="flex flex-col items-center cursor-pointer w-full h-full justify-center hover:bg-slate-100/50 transition-colors">
+                                        <Camera size={48} className="text-slate-300 group-hover:text-emerald-500 transition-colors" />
+                                        <div className="text-center mt-4">
+                                            <span className="text-xs font-black text-slate-800 uppercase tracking-widest block">Upload Photo</span>
+                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1 block px-4">Format Kotak Direkomendasikan</span>
+                                        </div>
+                                        <input type="file" className="hidden" accept="image/*" onChange={onSelectFile} disabled={isProcessing} />
+                                    </label>
+                                )}
+                            </div>
+                            
+                            <div className="space-y-3">
+                                <label className="text-[10px] font-black uppercase text-slate-600 tracking-[0.2em] px-1">Sexing Selection</label>
+                                <div className="grid grid-cols-3 gap-2">
+                                    {['male', 'female', 'unsex'].map(g => (
+                                      <button 
+                                        key={g}
+                                        type="button" 
+                                        disabled={isProcessing}
+                                        onClick={() => setFormData(prev => ({...prev, gender: g as any}))}
+                                        className={`py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${
+                                          formData.gender === g 
+                                            ? 'bg-emerald-500 text-white shadow-md' 
+                                            : 'bg-slate-50 text-slate-400 hover:bg-slate-100'
+                                        }`}
+                                      >
+                                          {g === 'male' ? <MaleIcon size={14} /> : 
+                                          g === 'female' ? <FemaleIcon size={14} /> : 
+                                          <HelpCircle size={14} />}
+                                          <span>{g}</span>
+                                      </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div className="space-y-6">
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-bold uppercase text-slate-400 tracking-widest flex justify-between px-1">
+                                  Gecko Name
+                                  {formErrors.name && <span className="text-red-500 text-[8px] animate-pulse">{formErrors.name}</span>}
+                                </label>
+                                <input 
+                                  placeholder="e.g. Apollo"
+                                  disabled={isProcessing}
+                                  className={`w-full px-5 py-3 bg-slate-50 border rounded-2xl font-bold transition-all text-sm uppercase ${
+                                    formErrors.name ? 'border-red-300 ring-4 ring-red-50' : 'border-slate-200 focus:border-emerald-500'
+                                  }`} 
+                                  value={formData.name || ''} 
+                                  onChange={e => {
+                                    setFormData({...formData, name: e.target.value.toUpperCase()});
+                                    if (formErrors.name) setFormErrors(prev => ({...prev, name: ''}));
+                                  }} 
+                                />
+                            </div>
+                            
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-bold uppercase text-slate-400 tracking-widest flex justify-between px-1">
+                                  Morph Genetics
+                                  {formErrors.morph && <span className="text-red-500 text-[8px] animate-pulse">{formErrors.morph}</span>}
+                                </label>
+                                <input 
+                                  placeholder="e.g. Mack Snow Eclipse"
+                                  disabled={isProcessing}
+                                  className={`w-full px-5 py-3 bg-slate-50 border rounded-2xl font-bold transition-all text-sm uppercase ${
+                                    formErrors.morph ? 'border-red-300 ring-4 ring-red-50' : 'border-slate-200 focus:border-emerald-500'
+                                  }`} 
+                                  value={formData.morph || ''} 
+                                  onChange={e => {
+                                    setFormData({...formData, morph: e.target.value.toUpperCase()});
+                                    if (formErrors.morph) setFormErrors(prev => ({...prev, morph: ''}));
+                                  }} 
+                                />
+                            </div>
+                            
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-bold uppercase text-slate-400 tracking-widest px-1">
+                                  Albino Strain
+                                </label>
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                  {['None', 'Tremper', 'Bell', 'Rainwater'].map(strain => (
+                                    <button
+                                      key={strain}
+                                      type="button"
+                                      disabled={isProcessing}
+                                      onClick={() => setFormData(prev => ({ ...prev, albinoStrain: strain as any }))}
+                                      className={`py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                                        formData.albinoStrain === strain
+                                          ? 'bg-emerald-500 text-white shadow-md'
+                                          : 'bg-slate-50 text-slate-400 hover:bg-slate-100'
+                                      }`}
+                                    >
+                                      {strain}
+                                    </button>
+                                  ))}
+                                </div>
+                            </div>
+                            
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold uppercase text-slate-400 tracking-widest px-1">Birth/Hatch Date</label>
+                                    <input 
+                                      type="date" 
+                                      disabled={isProcessing}
+                                      className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm" 
+                                      value={formData.birthDate || ''} 
+                                      onChange={e => setFormData({...formData, birthDate: e.target.value})} 
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold uppercase text-slate-400 tracking-widest px-1">Availability</label>
+                                    <select 
+                                      disabled={isProcessing}
+                                      className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm appearance-none flex-grow" 
+                                      value={formData.status || 'available'} 
+                                      onChange={e => setFormData({...formData, status: e.target.value as any})}
+                                    >
+                                        <option value="available">Available</option>
+                                        <option value="keep">Keep</option>
+                                        <option value="sold">Sold</option>
+                                        <option value="dead">Dead</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            {/* Sire & Dam Pedigree */}
+                            <div className="p-5 bg-slate-50 rounded-3xl border border-slate-100 space-y-4">
+                                <div className="flex items-center gap-2 mb-2 px-1">
+                                   <div className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
+                                   <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Sire Pedigree (Father)</label>
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <select 
+                                      disabled={isProcessing}
+                                      className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl font-bold text-xs" 
+                                      value={formData.sireId || ''} 
+                                      onChange={e => {
+                                        const s = geckos.find(g => g.id === e.target.value);
+                                        setFormData({...formData, sireId: e.target.value, sireName: s?.name || formData.sireName});
+                                      }}
+                                    >
+                                        <option value="">Select from Stock...</option>
+                                        {geckos.filter(g => g.gender === 'male' && g.status !== 'sold' && g.status !== 'dead').map(g => (
+                                          <option key={g.id} value={g.id}>{g.name}</option>
+                                        ))}
+                                    </select>
+                                    <input 
+                                      disabled={isProcessing}
+                                      className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl font-bold text-xs uppercase" 
+                                      placeholder="Or Enter Manual Name..."
+                                      value={formData.sireName || ''} 
+                                      onChange={e => setFormData({...formData, sireName: e.target.value.toUpperCase()})} 
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="p-5 bg-slate-50 rounded-3xl border border-slate-100 space-y-4">
+                                <div className="flex items-center gap-2 mb-2 px-1">
+                                   <div className="w-1.5 h-1.5 bg-rose-500 rounded-full" />
+                                   <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Dam Pedigree (Mother)</label>
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <select 
+                                      disabled={isProcessing}
+                                      className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl font-bold text-xs" 
+                                      value={formData.damId || ''} 
+                                      onChange={e => {
+                                        const d = geckos.find(g => g.id === e.target.value);
+                                        setFormData({...formData, damId: e.target.value, damName: d?.name || formData.damName});
+                                      }}
+                                    >
+                                        <option value="">Select from Stock...</option>
+                                        {geckos.filter(g => g.gender === 'female' && g.status !== 'sold' && g.status !== 'dead').map(g => (
+                                          <option key={g.id} value={g.id}>{g.name}</option>
+                                        ))}
+                                    </select>
+                                    <input 
+                                      disabled={isProcessing}
+                                      className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl font-bold text-xs uppercase" 
+                                      placeholder="Or Enter Manual Name..."
+                                      value={formData.damName || ''} 
+                                      onChange={e => setFormData({...formData, damName: e.target.value.toUpperCase()})} 
+                                    />
+                                </div>
+                            </div>
+                            
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-bold uppercase text-slate-400 tracking-widest px-1">Note / Description</label>
+                                <textarea 
+                                  disabled={isProcessing}
+                                  className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm h-28 uppercase" 
+                                  placeholder="Notes about gecko hatching or incubation environment..."
+                                  value={formData.note || ''} 
+                                  onChange={e => setFormData({...formData, note: e.target.value.toUpperCase()})} 
+                                />
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                
+                <div className="p-6 sm:p-8 border-t border-slate-100 flex flex-col-reverse sm:flex-row sm:justify-end gap-3 bg-white sticky bottom-0 z-30">
+                    <button 
+                      type="button"
+                      disabled={isProcessing}
+                      onClick={() => {
+                        setIsRegisterGeckoModalOpen(false);
+                        setSelectedClutch(null);
+                      }}
+                      className="px-8 py-4 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all"
+                    >
+                      Batal (Cancel)
+                    </button>
+                    <button 
+                      type="submit"
+                      form="gecko-inline-form"
+                      disabled={isProcessing}
+                      className="px-8 py-4 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all flex items-center justify-center gap-2 shadow-xl shadow-slate-200"
+                    >
+                      {isProcessing ? (
+                        <>
+                          <Loader2 size={16} className="animate-spin text-white" />
+                          <span>Processing... {uploadProgress > 0 ? `${uploadProgress}%` : ''}</span>
+                        </>
+                      ) : (
+                        <span>Register & Save Hatch</span>
+                      )}
+                    </button>
+                </div>
             </motion.div>
           </div>
         )}

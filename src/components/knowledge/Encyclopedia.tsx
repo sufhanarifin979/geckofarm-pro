@@ -58,7 +58,6 @@ function MorphListItem({ morph, onSelect, index }: MorphListItemProps) {
 
   return (
     <motion.div
-      layout
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.03 }}
@@ -333,16 +332,14 @@ export default function Encyclopedia() {
 
       {/* Expandable List */}
       <div className="space-y-3">
-        <AnimatePresence>
-          {filteredMorphs.map((morph, index) => (
-            <MorphListItem 
-              key={morph.id} 
-              morph={morph} 
-              onSelect={setSelectedMorph}
-              index={index}
-            />
-          ))}
-        </AnimatePresence>
+        {filteredMorphs.map((morph, index) => (
+          <MorphListItem 
+            key={morph.id} 
+            morph={morph} 
+            onSelect={setSelectedMorph}
+            index={index}
+          />
+        ))}
       </div>
 
       {filteredMorphs.length === 0 && (

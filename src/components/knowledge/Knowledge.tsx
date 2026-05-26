@@ -33,9 +33,9 @@ export default function Knowledge({ profile }: { profile: UserProfile | null }) 
   return (
     <div className={`flex flex-col min-h-screen transition-colors duration-500 ${isLightMode ? 'bg-white' : 'dark bg-slate-950'}`}>
       {/* Header */}
-      <header className={`border-b px-6 py-6 sticky top-0 z-50 transition-all duration-500 ${
+      <header className={`border-b px-6 py-6 transition-all duration-500 ${
         isLightMode 
-          ? 'bg-white/80 backdrop-blur-md border-slate-200' 
+          ? 'bg-white border-slate-200' 
           : 'bg-slate-900 border-slate-800'
       }`}>
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-6">

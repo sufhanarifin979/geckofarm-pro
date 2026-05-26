@@ -838,7 +838,6 @@ function ResultCard({ result }: { result: PredictionResult }) {
     <motion.div 
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
-      layout
       className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2.5rem] relative overflow-hidden group shadow-xl transition-all ${
         result.isBreedingTarget ? 'ring-2 ring-emerald-500/50' : ''
       }`}

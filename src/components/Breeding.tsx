@@ -279,13 +279,7 @@ export default function Breeding({ profile }: BreedingProps) {
                       onClick={() => setExpandedPairingId(isExpanded ? null : pairing.id!)}
                       className="p-5 cursor-pointer relative"
                     >
-                      {/* Status Badge */}
-                      <div className="absolute top-4 right-4 z-10">
-                        <span className="px-2.5 py-1 bg-emerald-100 text-emerald-600 text-[8px] font-black uppercase tracking-widest rounded-full flex items-center gap-1 shadow-sm border border-emerald-200">
-                          <div className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
-                          Active
-                        </span>
-                      </div>
+                      {/* Deleted Status Badge */}
 
                       <div className="flex flex-col gap-6">
                         <div className="flex items-center justify-between gap-4">
