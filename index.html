@@ -7,17 +7,73 @@
     <link rel="manifest" href="/manifest.json" />
     <title>Gecko Farm Pro</title>
     <script>
-      window.onerror = function(message, source, lineno, colno, error) {
+      function handleGlobalError(message, error) {
+        var errorText = "";
+        if (error) {
+          if (error.stack) {
+            errorText = error.stack;
+          } else if (error.message) {
+            errorText = error.message;
+          } else {
+            errorText = String(error);
+          }
+        } else {
+          errorText = String(message);
+        }
+
+        // Check if error is related to Firestore quota limit
+        var lowerError = errorText.toLowerCase();
+        var isQuotaError = lowerError.indexOf('quota') !== -1 || 
+                           lowerError.indexOf('resource-exhausted') !== -1 || 
+                           lowerError.indexOf('resource_exhausted') !== -1 || 
+                           lowerError.indexOf('indexeddb-quota-error') !== -1;
+
         var root = document.getElementById('root');
         if (root) {
-          root.innerHTML = '<div style="padding: 20px; color: #ef4444; font-family: sans-serif;">' +
-            '<h1 style="font-size: 1.5rem; font-weight: bold;">Initial Load Error</h1>' +
-            '<pre style="margin-top: 10px; padding: 10px; background: #fee2e2; border-radius: 8px; overflow: auto;">' + 
-            (error ? error.stack : message) + '</pre>' +
+          if (isQuotaError) {
+            // Check if user is admin (email suffering is inside the error context)
+            var isAdmin = errorText.indexOf('sufhan.arifin979@gmail.com') !== -1;
+            if (isAdmin) {
+              root.innerHTML = '<div style="padding: 24px; color: #ef4444; font-family: system-ui, -apple-system, sans-serif; background: #fafafa; min-height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center;">' +
+                '<div style="max-width: 600px; width: 100%; background: #ffffff; padding: 32px; border-radius: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.06); border: 1px solid #fee2e2;">' +
+                  '<h1 style="font-size: 1.5rem; font-weight: 800; color: #dc2626; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">⚠️ Firestore Quota Exceeded (Admin Mode)</h1>' +
+                  '<p style="color: #4b5563; margin-bottom: 20px; font-size: 0.875rem; line-height: 1.5;">This technical info is visible to you as the Admin (<strong>sufhan.arifin979@gmail.com</strong>). Regular users will see a clean Indonesian "Under Maintenance" screen.</p>' +
+                  '<pre style="padding: 16px; background: #fef2f2; border-radius: 12px; overflow: auto; border: 1px solid #fee2e2; font-family: monospace; font-size: 0.775rem; color: #991b1b; line-height: 1.6; max-height: 250px;">' + 
+                  errorText + '</pre>' +
+                '</div>' +
+              '</div>';
+            } else {
+              // Custom polished "Under Maintenance" page for regular users
+              root.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; min-height: 100vh; font-family: system-ui, -apple-system, sans-serif; background-color: #f8fafc; padding: 20px;">' +
+                '<div style="max-width: 480px; width: 100%; background: #ffffff; padding: 40px; border-radius: 24px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05); text-align: center; border: 1px solid #e2e8f0;">' +
+                  '<div style="font-size: 4rem; margin-bottom: 20px;">🛠️</div>' +
+                  '<h1 style="font-size: 1.5rem; font-weight: 700; color: #1e293b; margin-bottom: 12px;">Sistem Sedang Dioptimalkan</h1>' +
+                  '<p style="font-size: 0.925rem; color: #64748b; line-height: 1.6; margin-bottom: 24px;">Kami sedang melakukan pemeliharaan dan optimalisasi sistem secara berkala untuk meningkatkan kenyamanan Anda. Silakan coba beberapa saat lagi.</p>' +
+                  '<div style="font-size: 0.75rem; color: #94a3b8; font-family: monospace; border-top: 1px dashed #e2e8f0; padding-top: 16px;">Status: Pemeliharaan Server Berkala</div>' +
+                '</div>' +
+              '</div>';
+            }
+          } else {
+            // General error screen
+            root.innerHTML = '<div style="padding: 24px; color: #374151; font-family: system-ui, -apple-system, sans-serif; background: #f9fafb; min-height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center;">' +
+              '<div style="max-width: 600px; width: 100%; background: #ffffff; padding: 32px; border-radius: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); border: 1px solid #e5e7eb;">' +
+                '<h1 style="font-size: 1.5rem; font-weight: 800; color: #1f2937; margin-bottom: 12px;">Application Error</h1>' +
+                '<pre style="padding: 16px; background: #f3f4f6; border-radius: 12px; overflow: auto; border: 1px solid #e5e7eb; font-family: monospace; font-size: 0.775rem; color: #374151; line-height: 1.6;">' + 
+                errorText + '</pre>' +
+              '</div>' +
             '</div>';
+          }
         }
+      }
+
+      window.onerror = function(message, source, lineno, colno, error) {
+        handleGlobalError(message, error);
         return false;
       };
+
+      window.addEventListener('unhandledrejection', function(event) {
+        handleGlobalError(event.reason ? event.reason.message || event.reason : "Unhandled Promise Rejection", event.reason);
+      });
     </script>
   </head>
   <body>
