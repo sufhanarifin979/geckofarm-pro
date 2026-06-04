@@ -4,7 +4,7 @@ console.log("App.tsx: Module is loading...");
 
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { auth, getOrCreateUserProfile } from './lib/firebase';
+import { auth, getOrCreateUserProfile, updateProfileCache, isFirestoreQuotaExceeded } from './lib/firebase';
 import { UserProfile } from './types';
 import Sidebar from './components/Sidebar';
 import TopBar from './components/TopBar';
@@ -27,7 +27,22 @@ const Knowledge = lazy(() => import('./components/knowledge/Knowledge'));
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [profileState, setProfileState] = useState<UserProfile | null>(null);
+  const [quotaWarning, setQuotaWarning] = useState(false);
+
+  // Intercept profile updates to sync cache automatically
+  const setProfile = (newProfile: UserProfile | null | ((prev: UserProfile | null) => UserProfile | null)) => {
+    setProfileState(prev => {
+      const updated = typeof newProfile === 'function' ? newProfile(prev) : newProfile;
+      if (updated && updated.uid) {
+        updateProfileCache(updated.uid, updated);
+      }
+      return updated;
+    });
+  };
+
+  const profile = profileState;
+
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -48,9 +63,9 @@ export default function App() {
     addLog("App: Memulai inisialisasi...");
 
     const slowTimer = setTimeout(() => {
-      addLog("App: Loading terdeteksi lambat (>3 detik), menampilkan diagnosis.");
+      addLog("App: Loading terdeteksi lambat (>10 detik), menampilkan info bantuan.");
       setIsSlow(true);
-    }, 3000);
+    }, 10000);
 
     const handleGlobalError = (e: ErrorEvent) => {
       const msg = `Global Error: ${e.message} at ${e.filename}:${e.lineno}`;
@@ -96,7 +111,30 @@ export default function App() {
         if (u) {
           addLog("Mencoba memproses profil pengguna...");
           setUser(u);
-          const userProfile = await getOrCreateUserProfile(u);
+          let userProfile;
+          try {
+            userProfile = await getOrCreateUserProfile(u);
+            if (isFirestoreQuotaExceeded) {
+              setQuotaWarning(true);
+            }
+          } catch (profileErr: any) {
+            const errStri = profileErr instanceof Error ? profileErr.message : String(profileErr);
+            addLog(`Gagal memuat profil asli: ${errStri}. Menggunakan profil fallback lokal.`);
+            setHasError(errStri);
+            setQuotaWarning(true);
+            const isAutoPremium = u.email === 'sufhan.arifin979@gmail.com';
+            userProfile = {
+              uid: u.uid,
+              email: u.email || '',
+              farmName: 'My Gecko Farm (Offline/Local)',
+              farmPhotoUrl: '',
+              subscription: isAutoPremium ? 'premium' : 'free',
+              geckoCount: 0,
+              pairingCount: 0,
+              clutchCount: 0,
+              planLimit: isAutoPremium ? 10000 : 10
+            };
+          }
           setProfile(userProfile);
           addLog("Profil pengguna berhasil dimuat");
         } else {
@@ -108,16 +146,7 @@ export default function App() {
         const errorMsg = error instanceof Error ? error.message : String(error);
         addLog(`ERROR saat state-change: ${errorMsg}`);
         setHasError(errorMsg);
-        if (u) {
-          try {
-            await auth.signOut();
-            addLog("Keluar (signOut) berhasil setelah error profil");
-          } catch (signOutError: any) {
-            addLog(`Gagal signOut fallback: ${signOutError.message || String(signOutError)}`);
-          }
-          setUser(null);
-          setProfile(null);
-        }
+        // Do not force sign-out unless absolutely necessary, let them stay authenticated but with offline banner if wanted
       } finally {
         addLog("Status loading dinonaktifkan.");
         setLoading(false);
@@ -185,34 +214,31 @@ export default function App() {
         </div>
 
         {isSlow && (
-          <div className="mt-4 p-5 bg-slate-50 border border-slate-200 rounded-3xl max-w-md w-full text-left font-mono text-xs text-slate-600 animate-fade-in shadow-xl max-h-[70vh] overflow-hidden flex flex-col">
-            <div className="flex items-center justify-between border-b border-slate-200 pb-2 mb-2 flex-shrink-0">
-              <span className="font-bold text-slate-800 uppercase tracking-widest text-[10px]">Diagnosis Sistem</span>
-              <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[9px] font-bold">Menganalisis...</span>
+          <div className="mt-6 p-6 bg-slate-50 border border-slate-100 rounded-3xl max-w-sm w-full text-center animate-fade-in shadow-xl flex flex-col items-center">
+            <div className="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center text-amber-500 mb-3">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" className="lucide lucide-wifi-off"><line x1="2" y1="2" x2="22" y2="22"/><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.5"/><path d="M5 12.5a10.94 10.94 0 0 1 5.17-2.39"/><path d="M10.71 5.05A16 16 0 0 1 22.5 8"/><path d="M1.5 8a15.91 15.91 0 0 1 7.29-2.58"/><path d="M8.58 13.58A4.91 4.91 0 0 1 12 13a4.9 4.9 0 0 1 2.33.61"/></svg>
             </div>
             
+            <h3 className="font-bold text-slate-800 text-sm mb-1">
+              Koneksi Melambat
+            </h3>
+            
+            <p className="text-slate-500 text-xs leading-relaxed mb-4">
+              Aplikasi memerlukan waktu lebih lama dari biasanya untuk memuat. Silakan periksa jaringan internet Anda atau coba muat ulang halaman.
+            </p>
+
             {hasError && (
-              <div className="mb-3 p-3 bg-rose-50 border border-rose-200 rounded-2xl text-rose-700 font-sans font-medium text-xs leading-relaxed flex-shrink-0">
+              <div className="w-full mb-4 p-3 bg-rose-50 border border-rose-100 rounded-2xl text-rose-700 text-left text-[11px] leading-relaxed">
                 <strong className="block text-rose-800 mb-0.5">⚠️ Masalah Terdeteksi:</strong> 
                 {hasError}
-                <div className="mt-1 text-[10px] text-rose-500 font-mono">
-                  Kemungkinan besar API Key baru Anda dibatasi (Restricted), salah salin, atau Service Account bermasalah.
-                </div>
               </div>
             )}
             
-            <strong className="block text-[10px] text-slate-500 uppercase tracking-wider mb-1 flex-shrink-0">Log Aktivitas:</strong>
-            <div className="flex-1 overflow-y-auto space-y-1 pr-1 border border-slate-150 p-2 rounded-xl bg-white min-h-[100px]">
-              {logs.map((log, idx) => (
-                <div key={idx} className="leading-snug border-b border-slate-50 pb-1 last:border-0 last:pb-0 break-all">{log}</div>
-              ))}
-            </div>
-            
             <button 
               onClick={() => window.location.reload()} 
-              className="mt-4 w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-sans font-bold rounded-2xl transition-all text-xs flex items-center justify-center gap-1 shadow-lg shadow-emerald-600/10 active:scale-[0.98] flex-shrink-0"
+              className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-sans font-bold rounded-2xl transition-all text-xs flex items-center justify-center gap-1 shadow-lg shadow-emerald-600/10 active:scale-[0.98]"
             >
-              Coba Muat Ulang Halaman (Reload)
+              Coba Muat Ulang Halaman
             </button>
           </div>
         )}
@@ -244,6 +270,16 @@ export default function App() {
                   onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
                   onToggleMobileMenu={() => setMobileMenuOpen(!mobileMenuOpen)}
                 />
+                
+                {quotaWarning && (
+                  <div className="mx-4 mt-4 p-4 bg-amber-50 border border-amber-200 text-amber-900 rounded-2xl text-xs sm:text-sm font-medium flex items-center gap-3 shadow-sm animate-pulse flex-shrink-0">
+                    <span className="text-xl">⚠️</span>
+                    <div className="flex-1">
+                      <p className="font-bold">Firestore Quota Limit Exceeded (Spark Plan / Daily Limit)</p>
+                      <p className="text-amber-700 font-normal mt-0.5">Database telah mencapai batas harian Free Tier (Quota limit exceeded). Anda tetap dapat melihat aplikasi di mode **Offline/Fallback**. Batas kuota harian akan direset otomatis oleh Google keesokan harinya.</p>
+                    </div>
+                  </div>
+                )}
                 
                 <div className="flex-1 min-h-0 pb-12 sm:pb-20">
                   <Suspense fallback={

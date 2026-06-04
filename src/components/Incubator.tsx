@@ -39,11 +39,15 @@ interface IncubatorProps {
 
 export default function Incubator({ profile, setProfile }: IncubatorProps) {
   const navigate = useNavigate();
-  const { geckos } = useGeckos();
-  const [clutches, setClutches] = useState<Clutch[]>([]);
-  const [pairings, setPairings] = useState<Pairing[]>([]);
+  const { geckos, clutches, pairings, loading: geckosLoading } = useGeckos();
   const [loading, setLoading] = useState(true);
   const [weather, setWeather] = useState<{ temp: number; humidity: number } | null>(null);
+
+  useEffect(() => {
+    if (!geckosLoading) {
+      setLoading(false);
+    }
+  }, [geckosLoading]);
   
   // Hatching Modal State
   const [isHatchModalOpen, setIsHatchModalOpen] = useState(false);
@@ -108,38 +112,7 @@ export default function Incubator({ profile, setProfile }: IncubatorProps) {
     }
   }, []);
 
-  useEffect(() => {
-    if (!profile) return;
-    
-    const cQuery = query(collection(db, 'clutches'), where('ownerId', '==', profile.uid));
-    const pQuery = query(collection(db, 'pairings'), where('ownerId', '==', profile.uid));
-
-    const unsubC = onSnapshot(cQuery, (snap) => {
-      const list: Clutch[] = [];
-      const seen = new Set();
-      snap.forEach(docSnap => {
-        if (!seen.has(docSnap.id)) {
-          list.push({ id: docSnap.id, ...docSnap.data() } as Clutch);
-          seen.add(docSnap.id);
-        }
-      });
-      setClutches(list);
-    }, (err) => handleFirestoreError(err, OperationType.LIST, 'clutches'));
-
-    const unsubP = onSnapshot(pQuery, (snap) => {
-      const list: Pairing[] = [];
-      const seen = new Set();
-      snap.forEach(docSnap => {
-        if (!seen.has(docSnap.id)) {
-          list.push({ id: docSnap.id, ...docSnap.data() } as Pairing);
-          seen.add(docSnap.id);
-        }
-      });
-      setPairings(list);
-    }, (err) => handleFirestoreError(err, OperationType.LIST, 'pairings'));
-
-    return () => { unsubC(); unsubP(); };
-  }, [profile]);
+  // Utilizing central GeckoProvider (caching & shared listeners to avoid O(n) reads on navigation)
 
   // Only show clutches where (hatchedCount + failedCount) < eggCount or hatchedDate is not reached
   const activeClutches = clutches.filter(c => (c.hatchedCount + (c.failedCount || 0)) < c.eggCount);

@@ -19,6 +19,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { collection, query, onSnapshot, orderBy } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../../lib/firebase';
 import MorphDetail from './MorphDetail';
+import { COMPLETE_MORPH_DATABASE } from './data';
 
 interface ReferenceLink {
   title: string;
@@ -219,10 +220,15 @@ export default function Encyclopedia() {
         id: doc.id, 
         ...doc.data() 
       } as MorphEntry));
-      setMorphs(data);
+      if (data && data.length > 0) {
+        setMorphs(data);
+      } else {
+        setMorphs(COMPLETE_MORPH_DATABASE as unknown as MorphEntry[]);
+      }
       setLoading(false);
     }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'morphs');
+      console.warn("Firestore morphs snapshot error (e.g. quota limit). Falling back to local complete database:", error);
+      setMorphs(COMPLETE_MORPH_DATABASE as unknown as MorphEntry[]);
       setLoading(false);
     });
 

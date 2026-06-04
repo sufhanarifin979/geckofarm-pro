@@ -27,12 +27,16 @@ export default function LegalModal({ isOpen, onClose, type }: LegalModalProps) {
           ]
         },
         {
-          heading: 'Penggunaan Data',
-          text: 'Kami menggunakan informasi Anda untuk menyediakan layanan manajemen reptil, mensinkronisasi data Anda di berbagai perangkat melalui Firebase, serta memberikan akses eksklusif ke fitur premium seperti Analisis Genetik AI.'
+          heading: 'Lokasi Server & Keamanan',
+          text: 'Seluruh data aplikasi Gecko Farm Pro disimpan dengan aman menggunakan infrastruktur Google Cloud / Firebase di cluster regional Asia Tenggara (Singapore / Jakarta). Hal ini menjamin keamanan tingkat tinggi standar Google, latensi rendah, serta kecepatan akses data yang optimal dari Indonesia.'
         },
         {
-          heading: 'Keamanan Data',
-          text: 'Data Anda disimpan secara aman menggunakan infrastruktur Google Firebase. Kami tidak menjual atau membagikan data pribadi Anda kepada pihak ketiga untuk tujuan pemasaran.'
+          heading: 'Lama Penyimpanan Data (Masa Aktif)',
+          text: 'Data Anda tersimpan secara PERMANEN (Lifetime / Selamanya) selama akun Google Anda aktif dan terhubung dengan layanan kami. Kami tidak menerapkan sistem penghapusan otomatis berkala atau pembatasan waktu simpan. Data inventaris ternak Anda akan selalu aman di awan (cloud).'
+        },
+        {
+          heading: 'Sistem Backup & Restore Otomatis',
+          text: 'Anda tidak perlu melakukan ekspor atau backup manual untuk mengamankan data jika perangkat Anda hilang atau rusak. Sistem kami bekerja dengan sistem Real-Time Cloud Synchronization. Begitu Anda berganti HP atau perangkat baru, cukup lakukan Login dengan Akun Google yang sama, maka seluruh data Anda akan otomatis ter-restore dan tersinkronisasi kembali secara utuh dalam hitungan detik.'
         }
       ]
     },

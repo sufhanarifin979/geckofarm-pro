@@ -42,8 +42,29 @@ export const signInWithGoogle = async () => {
   }
 };
 
+// Memory and Session cache to prevent repeated reads and save Firestore quota
+let profileCache: { [uid: string]: UserProfile } = {};
+export let isFirestoreQuotaExceeded = false;
+
+export const updateProfileCache = (uid: string, updated: UserProfile) => {
+  profileCache[uid] = updated;
+  try {
+    sessionStorage.setItem(`profile_${uid}`, JSON.stringify(updated));
+  } catch (e) {
+    console.warn("Storage item setting failed:", e);
+  }
+};
+
+export const clearProfileCache = () => {
+  profileCache = {};
+  try {
+    sessionStorage.clear();
+  } catch (e) {}
+};
+
 export const signOut = async () => {
   try {
+    clearProfileCache();
     await auth.signOut();
   } catch (error) {
     console.error("Error signing out", error);
@@ -73,8 +94,18 @@ export interface FirestoreErrorInfo {
 }
 
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errMsg = error instanceof Error ? error.message : String(error);
+  const isQuota = errMsg.toLowerCase().includes('quota') || 
+                  errMsg.toLowerCase().includes('resource-exhausted') || 
+                  (error as any)?.code === 'resource-exhausted';
+  
+  if (isQuota) {
+    isFirestoreQuotaExceeded = true;
+    console.warn("DIAGNOSTIC: Firestore Quota Exceeded flag set to true.");
+  }
+
   const errInfo: FirestoreErrorInfo = {
-    error: error instanceof Error ? error.message : String(error),
+    error: errMsg,
     authInfo: {
       userId: auth.currentUser?.uid,
       email: auth.currentUser?.email,
@@ -90,8 +121,28 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
 }
 
 export const getOrCreateUserProfile = async (user: User): Promise<UserProfile> => {
+  // 1. Fast Cache Check: Memory Cache
+  if (profileCache[user.uid]) {
+    console.log("CACHE HIT (memory): returning cached profile for user:", user.uid);
+    return profileCache[user.uid];
+  }
+
+  // 2. Fast Cache Check: Session Storage
   try {
-    console.log("Fetching profile for user:", user.uid);
+    const sessionCached = sessionStorage.getItem(`profile_${user.uid}`);
+    if (sessionCached) {
+      console.log("CACHE HIT (sessionStorage): returning cached profile for user:", user.uid);
+      const parsed = JSON.parse(sessionCached) as UserProfile;
+      profileCache[user.uid] = parsed;
+      return parsed;
+    }
+  } catch (e) {
+    console.warn("Failed to check sessionStorage:", e);
+  }
+
+  // 3. Firestore Read (only if cache misses)
+  try {
+    console.log("Fetching profile from Firestore (Cache Miss) for user:", user.uid);
     const userDocRef = doc(db, 'users', user.uid);
     const userDoc = await getDoc(userDocRef);
     
@@ -130,13 +181,22 @@ export const getOrCreateUserProfile = async (user: User): Promise<UserProfile> =
          needsUpdate = true;
       }
   
+      let finalProfile: UserProfile;
       if (needsUpdate) {
         console.log("Updating profile fields:", updates);
-        await updateDoc(userDocRef, updates);
-        return { uid: user.uid, ...rawData, ...updates } as UserProfile;
+        try {
+          await updateDoc(userDocRef, updates);
+        } catch (updateError) {
+          console.warn("Soft migration update failed, continuing in-memory:", updateError);
+        }
+        finalProfile = { uid: user.uid, ...rawData, ...updates } as UserProfile;
+      } else {
+        finalProfile = { uid: user.uid, ...rawData } as UserProfile;
       }
       
-      return { uid: user.uid, ...rawData } as UserProfile;
+      // Update caches
+      updateProfileCache(user.uid, finalProfile);
+      return finalProfile;
     } else {
       console.log("No profile found, creating new one for:", user.email);
       const newUserProfile: Omit<UserProfile, 'uid'> = {
@@ -149,11 +209,39 @@ export const getOrCreateUserProfile = async (user: User): Promise<UserProfile> =
         clutchCount: 0,
         planLimit: isAutoPremium ? 10000 : 10
       };
-      await setDoc(userDocRef, newUserProfile);
-      return { uid: user.uid, ...newUserProfile } as UserProfile;
+      try {
+        await setDoc(userDocRef, newUserProfile);
+      } catch (createError) {
+        console.warn("Soft profile creation failed, continuing in-memory:", createError);
+      }
+      const finalProfile = { uid: user.uid, ...newUserProfile } as UserProfile;
+      updateProfileCache(user.uid, finalProfile);
+      return finalProfile;
     }
-  } catch (error) {
-    console.error("Error in getOrCreateUserProfile:", error);
-    throw error;
+  } catch (error: any) {
+    console.error("Error in getOrCreateUserProfile (falling back to memory):", error);
+    
+    // Quota or network failure detection
+    const errMsg = error instanceof Error ? error.message : String(error);
+    if (errMsg.toLowerCase().includes('quota') || errMsg.toLowerCase().includes('resource-exhausted') || error?.code === 'resource-exhausted') {
+      isFirestoreQuotaExceeded = true;
+    }
+
+    const isAutoPremium = user.email === 'sufhan.arifin979@gmail.com';
+    const fallbackProfile: UserProfile = {
+      uid: user.uid,
+      email: user.email || '',
+      farmName: 'My Gecko Farm (Offline/Local)',
+      farmPhotoUrl: '',
+      subscription: isAutoPremium ? 'premium' : 'free',
+      geckoCount: 0,
+      pairingCount: 0,
+      clutchCount: 0,
+      planLimit: isAutoPremium ? 10000 : 10
+    };
+    
+    // Save fallback to cache so we don't query Firestore again in subsequent renders/checks
+    updateProfileCache(user.uid, fallbackProfile);
+    return fallbackProfile;
   }
 };

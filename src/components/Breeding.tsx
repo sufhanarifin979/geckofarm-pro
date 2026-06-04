@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useGeckos } from '../GeckoProvider';
 import { 
   Heart, 
   Plus, 
@@ -27,9 +28,7 @@ interface BreedingProps {
 }
 
 export default function Breeding({ profile }: BreedingProps) {
-  const [geckos, setGeckos] = useState<Gecko[]>([]);
-  const [pairings, setPairings] = useState<Pairing[]>([]);
-  const [clutches, setClutches] = useState<Clutch[]>([]);
+  const { geckos, pairings, clutches } = useGeckos();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isClutchModalOpen, setIsClutchModalOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -73,51 +72,7 @@ export default function Breeding({ profile }: BreedingProps) {
     onConfirm: () => {}
   });
 
-  useEffect(() => {
-    if (!profile) return;
-    
-    const gQuery = query(collection(db, 'geckos'), where('ownerId', '==', profile.uid));
-    const pQuery = query(collection(db, 'pairings'), where('ownerId', '==', profile.uid));
-    const cQuery = query(collection(db, 'clutches'), where('ownerId', '==', profile.uid));
-
-    const unsubG = onSnapshot(gQuery, (snap) => {
-      const list: Gecko[] = [];
-      const seen = new Set();
-      snap.forEach(doc => {
-        if (!seen.has(doc.id)) {
-          list.push({ id: doc.id, ...doc.data() } as Gecko);
-          seen.add(doc.id);
-        }
-      });
-      setGeckos(list);
-    }, (err) => console.error('Breeding Geckos Snapshot Error:', err));
-
-    const unsubP = onSnapshot(pQuery, (snap) => {
-      const list: Pairing[] = [];
-      const seen = new Set();
-      snap.forEach(doc => {
-        if (!seen.has(doc.id)) {
-          list.push({ id: doc.id, ...doc.data() } as Pairing);
-          seen.add(doc.id);
-        }
-      });
-      setPairings(list);
-    }, (err) => console.error('Breeding Pairings Snapshot Error:', err));
-
-    const unsubC = onSnapshot(cQuery, (snap) => {
-      const list: Clutch[] = [];
-      const seen = new Set();
-      snap.forEach(doc => {
-        if (!seen.has(doc.id)) {
-          list.push({ id: doc.id, ...doc.data() } as Clutch);
-          seen.add(doc.id);
-        }
-      });
-      setClutches(list);
-    }, (err) => console.error('Breeding Clutches Snapshot Error:', err));
-
-    return () => { unsubG(); unsubP(); unsubC(); };
-  }, [profile]);
+  // Utilizing central GeckoProvider (caching & shared listeners to avoid O(n) reads on navigation)
 
   const handleAddPairing = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -15,110 +15,88 @@ import {
   Pie
 } from 'recharts';
 import { db } from '../lib/firebase';
-import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { UserProfile, Clutch, Gecko } from '../types';
 import { format, subMonths, startOfMonth, isAfter } from 'date-fns';
 import { Activity, TrendingUp, PieChart as PieChartIcon, Target } from 'lucide-react';
+import { useGeckos } from '../GeckoProvider';
 
 interface AnalyticsProps {
   profile: UserProfile | null;
 }
 
 export default function Analytics({ profile }: AnalyticsProps) {
+  const { geckos, clutches, loading: providerLoading } = useGeckos();
   const [populationData, setPopulationData] = useState<any[]>([]);
   const [successRateData, setSuccessRateData] = useState<any[]>([]);
   const [statusData, setStatusData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!profile) return;
+    if (providerLoading) return;
+    if (!profile) {
+      setLoading(false);
+      return;
+    }
 
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        
-        // 1. Population Trend (Geckos added over last 6 months)
-        const geckosSnap = await getDocs(query(
-          collection(db, 'geckos'),
-          where('ownerId', '==', profile.uid),
-          orderBy('createdAt', 'asc')
-        ));
-        
-        const geckos = geckosSnap.docs.map(doc => doc.data() as Gecko);
-        
-        // Group by month
-        const monthlyPopulation: { [key: string]: number } = {};
-        const months = Array.from({ length: 6 }).map((_, i) => {
-          const d = subMonths(new Date(), 5 - i);
-          return format(d, 'MMM yyyy');
-        });
-        
-        months.forEach(m => monthlyPopulation[m] = 0);
-        
-        let cumulative = 0;
-        // This is a bit tricky since we want cumulative but only for the last 6 months displayed
-        // We'll calculate cumulative starting from the beginning
-        
-        const allMonths: { [key: string]: number } = {};
+    try {
+      setLoading(true);
+      
+      // 1. Population Trend (Geckos added over last 6 months)
+      // Group by month
+      const monthlyPopulation: { [key: string]: number } = {};
+      const months = Array.from({ length: 6 }).map((_, i) => {
+        const d = subMonths(new Date(), 5 - i);
+        return format(d, 'MMM yyyy');
+      });
+      
+      months.forEach(m => monthlyPopulation[m] = 0);
+      
+      const allMonths: { [key: string]: number } = {};
+      geckos.forEach(g => {
+        if (g.createdAt) {
+          const date = g.createdAt.toDate ? g.createdAt.toDate() : new Date(g.createdAt);
+          const m = format(date, 'MMM yyyy');
+          allMonths[m] = (allMonths[m] || 0) + 1;
+        }
+      });
+
+      const popTrend = months.map(m => {
+        let total = 0;
         geckos.forEach(g => {
-          if (g.createdAt) {
-            const date = g.createdAt.toDate ? g.createdAt.toDate() : new Date(g.createdAt);
-            const m = format(date, 'MMM yyyy');
-            allMonths[m] = (allMonths[m] || 0) + 1;
-          }
+           if (g.createdAt) {
+              const date = g.createdAt.toDate ? g.createdAt.toDate() : new Date(g.createdAt);
+              if (date <= startOfMonth(new Date(m).getTime() + 86400000 * 32)) { // roughly end of month
+                 total++;
+              }
+           }
         });
+        return { name: m, total };
+      });
+      
+      setPopulationData(popTrend);
 
-        // Filter and calculate cumulative for the last 6 months
-        const sortedMonths = Object.keys(allMonths).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
-        
-        const popTrend = months.map(m => {
-          // Calculate total up to this month
-          let total = 0;
-          geckos.forEach(g => {
-             if (g.createdAt) {
-                const date = g.createdAt.toDate ? g.createdAt.toDate() : new Date(g.createdAt);
-                if (date <= startOfMonth(new Date(m).getTime() + 86400000 * 32)) { // roughly end of month
-                   total++;
-                }
-             }
-          });
-          return { name: m, total };
-        });
-        
-        setPopulationData(popTrend);
+      // 2. Breeding Success Rate (Hatched vs Failed eggs)
+      const successData = [
+        { name: 'Hatched', value: clutches.reduce((sum, c) => sum + (c.hatchedCount || 0), 0) },
+        { name: 'Failed', value: clutches.reduce((sum, c) => sum + (c.eggCount - (c.hatchedCount || 0)), 0) }
+      ];
+      
+      setSuccessRateData(successData);
 
-        // 2. Breeding Success Rate (Hatched vs Failed eggs)
-        const clutchesSnap = await getDocs(query(
-          collection(db, 'clutches'),
-          where('ownerId', '==', profile.uid)
-        ));
-        
-        const clutches = clutchesSnap.docs.map(doc => doc.data() as Clutch);
-        
-        const successData = [
-          { name: 'Hatched', value: clutches.reduce((sum, c) => sum + (c.hatchedCount || 0), 0) },
-          { name: 'Failed', value: clutches.reduce((sum, c) => sum + (c.eggCount - (c.hatchedCount || 0)), 0) }
-        ];
-        
-        setSuccessRateData(successData);
+      // 3. Status Distribution
+      const statuses = geckos.reduce((acc: any, g) => {
+        acc[g.status] = (acc[g.status] || 0) + 1;
+        return acc;
+      }, {});
+      
+      setStatusData(Object.entries(statuses).map(([name, value]) => ({ name: name.toUpperCase(), value })));
 
-        // 3. Status Distribution
-        const statuses = geckos.reduce((acc: any, g) => {
-          acc[g.status] = (acc[g.status] || 0) + 1;
-          return acc;
-        }, {});
-        
-        setStatusData(Object.entries(statuses).map(([name, value]) => ({ name: name.toUpperCase(), value })));
-
-      } catch (error) {
-        console.error("Error fetching analytics data:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-  }, [profile]);
+    } catch (error) {
+      console.error("Error calculating analytics data:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [profile, geckos, clutches, providerLoading]);
 
   if (loading) {
     return (
