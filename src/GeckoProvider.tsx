@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { db } from './lib/firebase';
+import { db, markFirestoreSuccess } from './lib/firebase';
 import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
 import { Gecko, Pairing, Clutch, UserProfile } from './types';
 
@@ -47,6 +47,7 @@ export function GeckoProvider({ profile, children }: { profile: UserProfile | nu
 
     // 1. Subscribe to Geckos
     const unsubG = onSnapshot(gQuery, (snapshot) => {
+      markFirestoreSuccess();
       const gList: Gecko[] = [];
       const seen = new Set();
       snapshot.forEach(docSnap => {
@@ -62,6 +63,7 @@ export function GeckoProvider({ profile, children }: { profile: UserProfile | nu
 
     // 2. Subscribe to Pairings
     const unsubP = onSnapshot(pQuery, (snapshot) => {
+      markFirestoreSuccess();
       const pList: Pairing[] = [];
       const seen = new Set();
       snapshot.forEach(docSnap => {
@@ -77,6 +79,7 @@ export function GeckoProvider({ profile, children }: { profile: UserProfile | nu
 
     // 3. Subscribe to Clutches
     const unsubC = onSnapshot(cQuery, (snapshot) => {
+      markFirestoreSuccess();
       const cList: Clutch[] = [];
       const seen = new Set();
       snapshot.forEach(docSnap => {

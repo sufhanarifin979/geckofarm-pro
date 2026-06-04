@@ -4,7 +4,7 @@ console.log("App.tsx: Module is loading...");
 
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { auth, getOrCreateUserProfile, updateProfileCache, isFirestoreQuotaExceeded } from './lib/firebase';
+import { auth, getOrCreateUserProfile, updateProfileCache, isFirestoreQuotaExceeded, subscribeToQuotaStatus } from './lib/firebase';
 import { UserProfile } from './types';
 import Sidebar from './components/Sidebar';
 import TopBar from './components/TopBar';
@@ -29,6 +29,32 @@ export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [profileState, setProfileState] = useState<UserProfile | null>(null);
   const [quotaWarning, setQuotaWarning] = useState(false);
+
+  useEffect(() => {
+    addLog("App: Memasang listener subscribeToQuotaStatus...");
+    const unsubscribeQuota = subscribeToQuotaStatus((exceeded) => {
+      addLog(`App: Status kuota terdeteksi -> ${exceeded ? 'EXCEEDED' : 'NORMAL'}`);
+      setQuotaWarning(exceeded);
+      
+      if (!exceeded && user) {
+        addLog("App: Kuota terdeteksi pulih kembali! Memuat ulang data dari Firestore...");
+        getOrCreateUserProfile(user)
+          .then((p) => {
+            setProfile(p);
+            setHasError(null);
+            addLog("App: Data profil berhasil diperbarui dari Firestore secara dinamis!");
+          })
+          .catch((err) => {
+            const errStr = err instanceof Error ? err.message : String(err);
+            console.warn("Gagal memuat ulang profil setelah kuota pulih:", errStr);
+          });
+      }
+    });
+
+    return () => {
+      unsubscribeQuota();
+    };
+  }, [user]);
 
   // Intercept profile updates to sync cache automatically
   const setProfile = (newProfile: UserProfile | null | ((prev: UserProfile | null) => UserProfile | null)) => {

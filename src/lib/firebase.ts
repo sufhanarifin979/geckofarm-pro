@@ -55,6 +55,57 @@ export const signInWithGoogle = async () => {
 let profileCache: { [uid: string]: UserProfile } = {};
 export let isFirestoreQuotaExceeded = false;
 
+type QuotaListener = (exceeded: boolean) => void;
+const quotaListeners = new Set<QuotaListener>();
+
+export const subscribeToQuotaStatus = (listener: QuotaListener) => {
+  quotaListeners.add(listener);
+  listener(isFirestoreQuotaExceeded);
+  return () => {
+    quotaListeners.delete(listener);
+  };
+};
+
+export const setFirestoreQuotaExceeded = (exceeded: boolean) => {
+  const changed = isFirestoreQuotaExceeded !== exceeded;
+  isFirestoreQuotaExceeded = exceeded;
+
+  if (!exceeded) {
+    // Clear any potential quota-related storage flags
+    try {
+      sessionStorage.removeItem('firestoreQuotaExceeded');
+      sessionStorage.removeItem('isFirestoreQuotaExceeded');
+      sessionStorage.removeItem('quotaWarning');
+      localStorage.removeItem('firestoreQuotaExceeded');
+      localStorage.removeItem('isFirestoreQuotaExceeded');
+      localStorage.removeItem('quotaWarning');
+    } catch (e) {
+      console.warn("Failed to clear quota storage flags:", e);
+    }
+  }
+
+  if (changed) {
+    if (!exceeded) {
+      // Hard clear the local in-memory and sessionStorage profiles to discard fallback profiles
+      clearProfileCache();
+    }
+    quotaListeners.forEach(listener => {
+      try {
+        listener(exceeded);
+      } catch (e) {
+        console.error("Error in quota listener callback:", e);
+      }
+    });
+  }
+};
+
+export function markFirestoreSuccess() {
+  if (isFirestoreQuotaExceeded) {
+    console.log("DIAGNOSTIC: Firestore query succeeded, recovering from quota limit!");
+    setFirestoreQuotaExceeded(false);
+  }
+}
+
 export const updateProfileCache = (uid: string, updated: UserProfile) => {
   profileCache[uid] = updated;
   try {
@@ -109,7 +160,7 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
                   (error as any)?.code === 'resource-exhausted';
   
   if (isQuota) {
-    isFirestoreQuotaExceeded = true;
+    setFirestoreQuotaExceeded(true);
     console.warn("DIAGNOSTIC: Firestore Quota Exceeded flag set to true.");
   }
 
@@ -154,6 +205,9 @@ export const getOrCreateUserProfile = async (user: User): Promise<UserProfile> =
     console.log("Fetching profile from Firestore (Cache Miss) for user:", user.uid);
     const userDocRef = doc(db, 'users', user.uid);
     const userDoc = await getDoc(userDocRef);
+    
+    // Successfully read userDoc - clear quota exceeded flag!
+    setFirestoreQuotaExceeded(false);
     
     const isAutoPremium = user.email === 'sufhan.arifin979@gmail.com';
   
@@ -233,7 +287,7 @@ export const getOrCreateUserProfile = async (user: User): Promise<UserProfile> =
     // Quota or network failure detection
     const errMsg = error instanceof Error ? error.message : String(error);
     if (errMsg.toLowerCase().includes('quota') || errMsg.toLowerCase().includes('resource-exhausted') || error?.code === 'resource-exhausted') {
-      isFirestoreQuotaExceeded = true;
+      setFirestoreQuotaExceeded(true);
     }
 
     const isAutoPremium = user.email === 'sufhan.arifin979@gmail.com';
