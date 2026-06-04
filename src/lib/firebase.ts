@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, User } from 'firebase/auth';
-import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, query, where, onSnapshot, addDoc, deleteDoc, serverTimestamp, increment, deleteField } from 'firebase/firestore';
+import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, query, where, onSnapshot, addDoc, deleteDoc, serverTimestamp, increment, deleteField, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 import { UserProfile } from '../types';
 
@@ -20,13 +20,22 @@ try {
 
 export const auth = getAuth(app);
 
-// Graceful firestore initialization
+// Graceful firestore initialization with persistent local cache
 let firestoreDb;
 try {
-  firestoreDb = getFirestore(app, firebaseConfig?.firestoreDatabaseId || undefined);
+  firestoreDb = initializeFirestore(app, {
+    localCache: persistentLocalCache({
+      tabManager: persistentMultipleTabManager()
+    })
+  }, firebaseConfig?.firestoreDatabaseId || undefined);
+  console.log("Firestore: Enabled Persistent Local Cache (IndexedDB).");
 } catch (e) {
-  console.error("Firestore init failed, falling back to default:", e);
-  firestoreDb = getFirestore(app);
+  console.warn("Firestore persistent caching is not supported in this browser environment. Falling back to default:", e);
+  try {
+    firestoreDb = getFirestore(app, firebaseConfig?.firestoreDatabaseId || undefined);
+  } catch (eFallback) {
+    firestoreDb = getFirestore(app);
+  }
 }
 export const db = firestoreDb;
 export const googleProvider = new GoogleAuthProvider();
