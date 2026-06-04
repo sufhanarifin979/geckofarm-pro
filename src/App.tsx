@@ -42,6 +42,7 @@ export default function App() {
   };
 
   const profile = profileState;
+  const isAdmin = user?.email === 'sufhan.arifin979@gmail.com' || profile?.email === 'sufhan.arifin979@gmail.com';
 
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -230,7 +231,7 @@ export default function App() {
             {hasError && (
               <div className="w-full mb-4 p-3 bg-rose-50 border border-rose-100 rounded-2xl text-rose-700 text-left text-[11px] leading-relaxed">
                 <strong className="block text-rose-800 mb-0.5">⚠️ Masalah Terdeteksi:</strong> 
-                {hasError}
+                {isAdmin ? hasError : "Koneksi ke server sedang mengalami gangguan sementara atau sedang dalam pemeliharaan berkala."}
               </div>
             )}
             
@@ -272,13 +273,23 @@ export default function App() {
                 />
                 
                 {quotaWarning && (
-                  <div className="mx-4 mt-4 p-4 bg-amber-50 border border-amber-200 text-amber-900 rounded-2xl text-xs sm:text-sm font-medium flex items-center gap-3 shadow-sm animate-pulse flex-shrink-0">
-                    <span className="text-xl">⚠️</span>
-                    <div className="flex-1">
-                      <p className="font-bold">Firestore Quota Limit Exceeded (Spark Plan / Daily Limit)</p>
-                      <p className="text-amber-700 font-normal mt-0.5">Database telah mencapai batas harian Free Tier (Quota limit exceeded). Anda tetap dapat melihat aplikasi di mode **Offline/Fallback**. Batas kuota harian akan direset otomatis oleh Google keesokan harinya.</p>
+                  isAdmin ? (
+                    <div className="mx-4 mt-4 p-4 bg-amber-50 border border-amber-200 text-amber-900 rounded-2xl text-xs sm:text-sm font-medium flex items-center gap-3 shadow-sm animate-pulse flex-shrink-0">
+                      <span className="text-xl">⚠️</span>
+                      <div className="flex-1">
+                        <p className="font-bold">Firestore Quota Limit Exceeded (Spark Plan / Daily Limit)</p>
+                        <p className="text-amber-700 font-normal mt-0.5">Database telah mencapai batas harian Free Tier (Quota limit exceeded). Anda tetap dapat melihat aplikasi di mode **Offline/Fallback**. Batas kuota harian akan direset otomatis oleh Google keesokan harinya.</p>
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="mx-4 mt-4 p-4 bg-slate-50 border border-slate-200 text-slate-700 rounded-2xl text-xs sm:text-sm font-medium flex items-center gap-3 shadow-sm animate-pulse flex-shrink-0">
+                      <span className="text-xl">🛠️</span>
+                      <div className="flex-1">
+                        <p className="font-bold text-slate-800">Sistem Sedang Dioptimalkan (Under Maintenance)</p>
+                        <p className="text-slate-600 font-normal mt-0.5">Kami sedang melakukan pemeliharaan dan optimalisasi sistem secara berkala untuk kenyamanan Anda. Aplikasi tetap dapat digunakan dalam mode performa hemat.</p>
+                      </div>
+                    </div>
+                  )
                 )}
                 
                 <div className="flex-1 min-h-0 pb-12 sm:pb-20">
