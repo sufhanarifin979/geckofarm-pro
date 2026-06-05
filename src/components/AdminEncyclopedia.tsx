@@ -10,7 +10,7 @@ import {
   serverTimestamp,
   orderBy
 } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { db, handleFirestoreError, OperationType, registerListener, auth } from '../lib/firebase';
 import { 
   Search, 
   Plus, 
@@ -93,8 +93,12 @@ export default function AdminEncyclopedia() {
   });
 
   useEffect(() => {
+    if (!auth.currentUser) {
+      setLoading(false);
+      return;
+    }
     const q = query(collection(db, 'morphs'), orderBy('name', 'asc'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    const rawUnsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ 
         ...doc.data(),
         id: doc.id
@@ -106,6 +110,7 @@ export default function AdminEncyclopedia() {
       setLoading(false);
     });
 
+    const unsubscribe = registerListener(rawUnsubscribe);
     return () => unsubscribe();
   }, []);
 

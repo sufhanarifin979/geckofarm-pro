@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { collection, query, onSnapshot, doc, updateDoc, getDocs, where } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { db, handleFirestoreError, OperationType, registerListener, auth } from '../lib/firebase';
 import { UserProfile } from '../types';
 import { 
   Users, 
@@ -29,8 +29,12 @@ export default function AdminPanel() {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!auth.currentUser) {
+      setLoading(false);
+      return;
+    }
     const q = query(collection(db, 'users'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    const rawUnsubscribe = onSnapshot(q, (snapshot) => {
       const profileData = snapshot.docs.map(doc => ({ 
         uid: doc.id, 
         ...doc.data() 
@@ -42,6 +46,7 @@ export default function AdminPanel() {
       setLoading(false);
     });
 
+    const unsubscribe = registerListener(rawUnsubscribe);
     return () => unsubscribe();
   }, []);
 

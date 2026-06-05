@@ -4,7 +4,7 @@ console.log("App.tsx: Module is loading...");
 
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { auth, getOrCreateUserProfile, updateProfileCache, isFirestoreQuotaExceeded, subscribeToQuotaStatus } from './lib/firebase';
+import { auth, getOrCreateUserProfile, updateProfileCache, isFirestoreQuotaExceeded, subscribeToQuotaStatus, unsubscribeAllListeners } from './lib/firebase';
 import { UserProfile } from './types';
 import Sidebar from './components/Sidebar';
 import TopBar from './components/TopBar';
@@ -134,6 +134,9 @@ export default function App() {
 
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
       addLog(`onAuthStateChanged dipicu. User: ${u ? u.email : 'null (logged out)'}`);
+      if (u) {
+        setLoading(true); // Maintain loading screen while fetching profile
+      }
       try {
         if (u) {
           addLog("Mencoba memproses profil pengguna...");
@@ -166,6 +169,7 @@ export default function App() {
           addLog("Profil pengguna berhasil dimuat");
         } else {
           addLog("Status Auth: Pengguna belum masuk.");
+          unsubscribeAllListeners();
           setUser(null);
           setProfile(null);
         }
@@ -243,7 +247,7 @@ export default function App() {
         {isSlow && (
           <div className="mt-6 p-6 bg-slate-50 border border-slate-100 rounded-3xl max-w-sm w-full text-center animate-fade-in shadow-xl flex flex-col items-center">
             <div className="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center text-amber-500 mb-3">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" className="lucide lucide-wifi-off"><line x1="2" y1="2" x2="22" y2="22"/><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.5"/><path d="M5 12.5a10.94 10.94 0 0 1 5.17-2.39"/><path d="M10.71 5.05A16 16 0 0 1 22.5 8"/><path d="M1.5 8a15.91 15.91 0 0 1 7.29-2.58"/><path d="M8.58 13.58A4.91 4.91 0 0 1 12 13a4.9 4.9 0 0 1 2.33.61"/></svg>
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-wifi-off"><line x1="2" y1="2" x2="22" y2="22"/><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.5"/><path d="M5 12.5a10.94 10.94 0 0 1 5.17-2.39"/><path d="M10.71 5.05A16 16 0 0 1 22.5 8"/><path d="M1.5 8a15.91 15.91 0 0 1 7.29-2.58"/><path d="M8.58 13.58A4.91 4.91 0 0 1 12 13a4.9 4.9 0 0 1 2.33.61"/></svg>
             </div>
             
             <h3 className="font-bold text-slate-800 text-sm mb-1">

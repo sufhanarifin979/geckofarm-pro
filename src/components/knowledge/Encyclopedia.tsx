@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { collection, query, onSnapshot, orderBy } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType } from '../../lib/firebase';
+import { db, handleFirestoreError, OperationType, registerListener } from '../../lib/firebase';
 import MorphDetail from './MorphDetail';
 import { COMPLETE_MORPH_DATABASE } from './data';
 
@@ -215,7 +215,7 @@ export default function Encyclopedia() {
 
   useEffect(() => {
     const q = query(collection(db, 'morphs'), orderBy('name', 'asc'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    const rawUnsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ 
         id: doc.id, 
         ...doc.data() 
@@ -232,6 +232,7 @@ export default function Encyclopedia() {
       setLoading(false);
     });
 
+    const unsubscribe = registerListener(rawUnsubscribe);
     return () => unsubscribe();
   }, []);
 

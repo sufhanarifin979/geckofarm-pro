@@ -43,34 +43,29 @@ export default function Analytics({ profile }: AnalyticsProps) {
       
       // 1. Population Trend (Geckos added over last 6 months)
       // Group by month
-      const monthlyPopulation: { [key: string]: number } = {};
       const months = Array.from({ length: 6 }).map((_, i) => {
         const d = subMonths(new Date(), 5 - i);
-        return format(d, 'MMM yyyy');
+        return {
+          name: format(d, 'MMM yyyy'),
+          cutoff: new Date(d.getFullYear(), d.getMonth() + 1, 1).getTime() // start of next month
+        };
       });
       
-      months.forEach(m => monthlyPopulation[m] = 0);
-      
-      const allMonths: { [key: string]: number } = {};
-      geckos.forEach(g => {
-        if (g.createdAt) {
-          const date = g.createdAt.toDate ? g.createdAt.toDate() : new Date(g.createdAt);
-          const m = format(date, 'MMM yyyy');
-          allMonths[m] = (allMonths[m] || 0) + 1;
-        }
-      });
-
       const popTrend = months.map(m => {
         let total = 0;
         geckos.forEach(g => {
-           if (g.createdAt) {
+          if (g.createdAt) {
+            try {
               const date = g.createdAt.toDate ? g.createdAt.toDate() : new Date(g.createdAt);
-              if (date <= startOfMonth(new Date(m).getTime() + 86400000 * 32)) { // roughly end of month
-                 total++;
+              if (!isNaN(date.getTime()) && date.getTime() < m.cutoff) {
+                total++;
               }
-           }
+            } catch (e) {
+              // ignore invalid date strings gracefully
+            }
+          }
         });
-        return { name: m, total };
+        return { name: m.name, total };
       });
       
       setPopulationData(popTrend);

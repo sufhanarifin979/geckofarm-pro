@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, User } from 'firebase/auth';
-import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, query, where, onSnapshot, addDoc, deleteDoc, serverTimestamp, increment, deleteField, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
+import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, doc, getDoc, setDoc, updateDoc, collection, query, where, onSnapshot, addDoc, deleteDoc, serverTimestamp, increment, deleteField } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 import { UserProfile } from '../types';
 
@@ -20,7 +20,8 @@ try {
 
 export const auth = getAuth(app);
 
-// Graceful firestore initialization with persistent local cache
+// Initialize Firestore with robust local offline persistence (IndexedDB).
+// If running in sandboxed frames that block IndexedDB, it gracefully falls back to memory-only database.
 let firestoreDb;
 try {
   firestoreDb = initializeFirestore(app, {
@@ -28,12 +29,12 @@ try {
       tabManager: persistentMultipleTabManager()
     })
   }, firebaseConfig?.firestoreDatabaseId || undefined);
-  console.log("Firestore: Enabled Persistent Local Cache (IndexedDB).");
+  console.log("Firestore: Initialized with robust persistentLocalCache (IndexedDB) for maximum quota efficiency!");
 } catch (e) {
-  console.warn("Firestore persistent caching is not supported in this browser environment. Falling back to default:", e);
+  console.warn("Firestore persistent initialization failed, falling back to standard memory-only cache:", e);
   try {
     firestoreDb = getFirestore(app, firebaseConfig?.firestoreDatabaseId || undefined);
-  } catch (eFallback) {
+  } catch (err) {
     firestoreDb = getFirestore(app);
   }
 }
@@ -122,8 +123,31 @@ export const clearProfileCache = () => {
   } catch (e) {}
 };
 
+const activeListeners = new Set<() => void>();
+
+export const registerListener = (unsubscribe: () => void): (() => void) => {
+  activeListeners.add(unsubscribe);
+  return () => {
+    unsubscribe();
+    activeListeners.delete(unsubscribe);
+  };
+};
+
+export const unsubscribeAllListeners = () => {
+  console.log(`Unsubscribing from all ${activeListeners.size} active Firestore listeners...`);
+  activeListeners.forEach(unsub => {
+    try {
+      unsub();
+    } catch (e) {
+      console.warn("Failed to unsubscribe active listener during cleanup:", e);
+    }
+  });
+  activeListeners.clear();
+};
+
 export const signOut = async () => {
   try {
+    unsubscribeAllListeners();
     clearProfileCache();
     await auth.signOut();
   } catch (error) {
