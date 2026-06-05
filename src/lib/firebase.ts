@@ -56,6 +56,29 @@ export const signInWithGoogle = async () => {
 let profileCache: { [uid: string]: UserProfile } = {};
 export let isFirestoreQuotaExceeded = false;
 
+// Global memory caches to save Firestore reads on non-realtime collections
+let morphsCache: any[] | null = null;
+let adminUsersCache: any[] | null = null;
+
+export const getCachedMorphs = () => morphsCache;
+export const setCachedMorphs = (data: any[]) => {
+  morphsCache = data;
+};
+export const clearCachedMorphs = () => {
+  morphsCache = null;
+  try {
+    localStorage.removeItem('cache_encyclopedia_morphs');
+  } catch (e) {}
+};
+
+export const getCachedAdminUsers = () => adminUsersCache;
+export const setCachedAdminUsers = (data: any[]) => {
+  adminUsersCache = data;
+};
+export const clearCachedAdminUsers = () => {
+  adminUsersCache = null;
+};
+
 type QuotaListener = (exceeded: boolean) => void;
 const quotaListeners = new Set<QuotaListener>();
 

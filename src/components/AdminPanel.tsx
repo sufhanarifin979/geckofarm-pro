@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { collection, query, onSnapshot, doc, updateDoc, getDocs, where } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType, registerListener, auth } from '../lib/firebase';
+import { db, handleFirestoreError, OperationType, registerListener, auth, getCachedAdminUsers, setCachedAdminUsers, clearCachedAdminUsers } from '../lib/firebase';
 import { UserProfile } from '../types';
 import { 
   Users, 
@@ -15,7 +15,8 @@ import {
   Mail,
   Calendar,
   Layers,
-  BookOpen
+  BookOpen,
+  RotateCw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import AdminEncyclopedia from './AdminEncyclopedia';
@@ -33,6 +34,15 @@ export default function AdminPanel() {
       setLoading(false);
       return;
     }
+
+    // Try memory cache first
+    const memCache = getCachedAdminUsers();
+    if (memCache && memCache.length > 0) {
+      setProfiles(memCache as UserProfile[]);
+      setLoading(false);
+      return;
+    }
+
     const q = query(collection(db, 'users'));
     const rawUnsubscribe = onSnapshot(q, (snapshot) => {
       const profileData = snapshot.docs.map(doc => ({ 
@@ -40,6 +50,7 @@ export default function AdminPanel() {
         ...doc.data() 
       } as UserProfile));
       setProfiles(profileData);
+      setCachedAdminUsers(profileData);
       setLoading(false);
     }, (error) => {
       handleFirestoreError(error, OperationType.GET, 'users');
@@ -50,6 +61,25 @@ export default function AdminPanel() {
     return () => unsubscribe();
   }, []);
 
+  const handleRefreshUsers = async () => {
+    setLoading(true);
+    clearCachedAdminUsers();
+    try {
+      const q = query(collection(db, 'users'));
+      const snapshot = await getDocs(q);
+      const profileData = snapshot.docs.map(doc => ({ 
+        uid: doc.id, 
+        ...doc.data() 
+      } as UserProfile));
+      setProfiles(profileData);
+      setCachedAdminUsers(profileData);
+    } catch (error) {
+      console.error("Error refreshing users list:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleUpgrade = async (uid: string, currentSub: string) => {
     setUpdatingId(uid);
     try {
@@ -59,6 +89,7 @@ export default function AdminPanel() {
         subscription: newSub,
         planLimit: newLimit
       });
+      clearCachedAdminUsers();
     } catch (error) {
       console.error(error);
     } finally {
@@ -153,7 +184,7 @@ export default function AdminPanel() {
             </div>
 
             {/* Filters */}
-            <div className="flex flex-col lg:flex-row gap-4">
+            <div className="flex flex-col lg:flex-row lg:items-center gap-4">
               <div className="relative flex-1">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                 <input 
@@ -179,6 +210,14 @@ export default function AdminPanel() {
                   </button>
                 ))}
               </div>
+              <button
+                onClick={handleRefreshUsers}
+                disabled={loading}
+                className="flex items-center justify-center p-4 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm hover:scale-105 active:scale-95 transition-all text-slate-600 dark:text-slate-300 cursor-pointer h-[54px] w-[54px]"
+                title="Refresh Member List"
+              >
+                <RotateCw size={18} className={loading ? "animate-spin text-emerald-500" : ""} />
+              </button>
             </div>
 
             {/* User List Table (Desktop View for Admin is usually better) */}

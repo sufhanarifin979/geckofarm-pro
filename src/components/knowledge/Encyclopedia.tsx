@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { collection, query, onSnapshot, orderBy } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType, registerListener } from '../../lib/firebase';
+import { db, handleFirestoreError, OperationType, registerListener, getCachedMorphs, setCachedMorphs } from '../../lib/firebase';
 import MorphDetail from './MorphDetail';
 import { COMPLETE_MORPH_DATABASE } from './data';
 
@@ -214,21 +214,49 @@ export default function Encyclopedia() {
   const [selectedMorph, setSelectedMorph] = useState<MorphEntry | null>(null);
 
   useEffect(() => {
+    // 1. Try memory cache first
+    const memCache = getCachedMorphs();
+    if (memCache && memCache.length > 0) {
+      setMorphs(memCache as MorphEntry[]);
+      setLoading(false);
+      return;
+    }
+
+    // 2. Try localStorage cache next
+    let localCacheLoaded = false;
+    try {
+      const local = localStorage.getItem('cache_encyclopedia_morphs');
+      if (local) {
+        const parsed = JSON.parse(local);
+        if (parsed && parsed.length > 0) {
+          setMorphs(parsed);
+          setCachedMorphs(parsed);
+          setLoading(false);
+          localCacheLoaded = true;
+        }
+      }
+    } catch (e) {
+      console.warn("Failed to load morphs from localStorage:", e);
+    }
+
     const q = query(collection(db, 'morphs'), orderBy('name', 'asc'));
     const rawUnsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ 
         id: doc.id, 
         ...doc.data() 
       } as MorphEntry));
-      if (data && data.length > 0) {
-        setMorphs(data);
-      } else {
-        setMorphs(COMPLETE_MORPH_DATABASE as unknown as MorphEntry[]);
-      }
+      const finalData = (data && data.length > 0) ? data : (COMPLETE_MORPH_DATABASE as unknown as MorphEntry[]);
+      setMorphs(finalData);
+      setCachedMorphs(finalData);
       setLoading(false);
+      try {
+        localStorage.setItem('cache_encyclopedia_morphs', JSON.stringify(finalData));
+      } catch (e) {}
     }, (error) => {
       console.warn("Firestore morphs snapshot error (e.g. quota limit). Falling back to local complete database:", error);
-      setMorphs(COMPLETE_MORPH_DATABASE as unknown as MorphEntry[]);
+      if (!localCacheLoaded) {
+        setMorphs(COMPLETE_MORPH_DATABASE as unknown as MorphEntry[]);
+      }
       setLoading(false);
     });
 

@@ -10,7 +10,7 @@ import {
   serverTimestamp,
   orderBy
 } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType, registerListener, auth } from '../lib/firebase';
+import { db, handleFirestoreError, OperationType, registerListener, auth, getCachedMorphs, setCachedMorphs, clearCachedMorphs } from '../lib/firebase';
 import { 
   Search, 
   Plus, 
@@ -97,6 +97,32 @@ export default function AdminEncyclopedia() {
       setLoading(false);
       return;
     }
+
+    // Try memory cache first
+    const memCache = getCachedMorphs();
+    if (memCache && memCache.length > 0) {
+      setMorphs(memCache as MorphEntry[]);
+      setLoading(false);
+      return;
+    }
+
+    // Try localStorage cache next
+    let localCacheLoaded = false;
+    try {
+      const local = localStorage.getItem('cache_encyclopedia_morphs');
+      if (local) {
+        const parsed = JSON.parse(local);
+        if (parsed && parsed.length > 0) {
+          setMorphs(parsed);
+          setCachedMorphs(parsed);
+          setLoading(false);
+          localCacheLoaded = true;
+        }
+      }
+    } catch (e) {
+      console.warn("Failed to load morphs from localStorage:", e);
+    }
+
     const q = query(collection(db, 'morphs'), orderBy('name', 'asc'));
     const rawUnsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ 
@@ -104,10 +130,16 @@ export default function AdminEncyclopedia() {
         id: doc.id
       } as MorphEntry));
       setMorphs(data);
+      setCachedMorphs(data);
       setLoading(false);
+      try {
+        localStorage.setItem('cache_encyclopedia_morphs', JSON.stringify(data));
+      } catch (e) {}
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, 'morphs');
-      setLoading(false);
+      if (!localCacheLoaded) {
+        setLoading(false);
+      }
     });
 
     const unsubscribe = registerListener(rawUnsubscribe);
@@ -152,6 +184,7 @@ export default function AdminEncyclopedia() {
         });
       }
       
+      clearCachedMorphs();
       setIsModalOpen(false);
       setEditingMorph(null);
       resetForm();
@@ -171,6 +204,7 @@ export default function AdminEncyclopedia() {
       // Explicitly target the correct collection and document ID
       const morphRef = doc(db, 'morphs', deleteConfirmation.id);
       await deleteDoc(morphRef);
+      clearCachedMorphs();
       setDeleteConfirmation(null);
     } catch (error) {
       console.error('CRITICAL: Delete failed:', error);
