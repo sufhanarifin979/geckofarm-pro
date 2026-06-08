@@ -44,7 +44,7 @@ export default function AdminPanel() {
     }
 
     const q = query(collection(db, 'users'));
-    const rawUnsubscribe = onSnapshot(q, (snapshot) => {
+    getDocs(q).then((snapshot) => {
       const profileData = snapshot.docs.map(doc => ({ 
         uid: doc.id, 
         ...doc.data() 
@@ -52,13 +52,10 @@ export default function AdminPanel() {
       setProfiles(profileData);
       setCachedAdminUsers(profileData);
       setLoading(false);
-    }, (error) => {
+    }).catch((error) => {
       handleFirestoreError(error, OperationType.GET, 'users');
       setLoading(false);
     });
-
-    const unsubscribe = registerListener(rawUnsubscribe);
-    return () => unsubscribe();
   }, []);
 
   const handleRefreshUsers = async () => {

@@ -20,16 +20,28 @@ try {
 
 export const auth = getAuth(app);
 
-// Initialize Firestore with robust local offline persistence (IndexedDB).
-// If running in sandboxed frames that block IndexedDB, it gracefully falls back to memory-only database.
+// Initialize Firestore with robust local offline persistence.
+// We avoid MultipleTabManager in sandboxed iframe or dev-environments to prevent runtime 
+// BroadcastChannel/IndexedDB friction (which causes "FIRESTORE INTERNAL ASSERTION FAILED" crashes).
 let firestoreDb;
 try {
-  firestoreDb = initializeFirestore(app, {
-    localCache: persistentLocalCache({
-      tabManager: persistentMultipleTabManager()
-    })
-  }, firebaseConfig?.firestoreDatabaseId || undefined);
-  console.log("Firestore: Initialized with robust persistentLocalCache (IndexedDB) for maximum quota efficiency!");
+  const isIframe = typeof window !== 'undefined' && window.self !== window.top;
+  
+  if (isIframe) {
+    console.log("Firestore: Running inside an iframe preview. Initializing standard cache for absolute stability.");
+    // In iframe sandbox, standard getFirestore/initializeFirestore is safest.
+    try {
+      firestoreDb = getFirestore(app, firebaseConfig?.firestoreDatabaseId || undefined);
+    } catch {
+      firestoreDb = getFirestore(app);
+    }
+  } else {
+    // If not in iframe, initialize with a stable persistent local cache (single-tab, which is highly reliable)
+    firestoreDb = initializeFirestore(app, {
+      localCache: persistentLocalCache({}) // Defaults to single-tab manager, avoiding buggy cross-tab locking
+    }, firebaseConfig?.firestoreDatabaseId || undefined);
+    console.log("Firestore: Initialized with stable single-tab persistentLocalCache!");
+  }
 } catch (e) {
   console.warn("Firestore persistent initialization failed, falling back to standard memory-only cache:", e);
   try {

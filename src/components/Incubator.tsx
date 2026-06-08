@@ -39,7 +39,7 @@ interface IncubatorProps {
 
 export default function Incubator({ profile, setProfile }: IncubatorProps) {
   const navigate = useNavigate();
-  const { geckos, clutches, pairings, loading: geckosLoading } = useGeckos();
+  const { geckos, clutches, pairings, loading: geckosLoading, refreshData } = useGeckos();
   const [loading, setLoading] = useState(true);
   const [weather, setWeather] = useState<{ temp: number; humidity: number } | null>(null);
 
@@ -136,6 +136,11 @@ export default function Incubator({ profile, setProfile }: IncubatorProps) {
       }
 
       await updateDoc(doc(db, 'clutches', clutchId), updateData);
+      try {
+        await refreshData();
+      } catch (e) {
+        console.warn("Soft refresh failed after hatch count update:", e);
+      }
       addToast(isFail ? "Data Gagal/Slug tercatat!" : "Data berhasil ditambahkan!");
       setIsHatchModalOpen(false);
     } catch (error) {
@@ -240,6 +245,11 @@ export default function Incubator({ profile, setProfile }: IncubatorProps) {
 
       // Commit everything atomically in one go!
       await batch.commit();
+      try {
+        await refreshData();
+      } catch (e) {
+        console.warn("Soft refresh failed after gecko batch registration:", e);
+      }
 
       // D. Update local profile state if setProfile is provided
       if (setProfile) {

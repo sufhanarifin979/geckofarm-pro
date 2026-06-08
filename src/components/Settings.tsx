@@ -8,7 +8,8 @@ import {
   ChevronRight,
   User,
   Info,
-  LogOut
+  LogOut,
+  Phone
 } from 'lucide-react';
 import { UserProfile } from '../types';
 import { db, signOut } from '../lib/firebase';
@@ -232,6 +233,25 @@ export default function Settings({ profile, setProfile }: SettingsProps) {
             onClose={() => setIsPremiumModalOpen(false)} 
             profile={profile} 
           />
+
+          <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm flex flex-col gap-4">
+             <div className="flex items-center gap-2 mb-2">
+                <Phone size={20} className="text-emerald-500" />
+                <h3 className="text-xs font-bold uppercase text-slate-500 tracking-widest leading-none">Dukungan & Hubungi Admin</h3>
+             </div>
+             <p className="text-[10px] text-slate-500 font-medium px-1">
+               Jika Anda memerlukan bantuan teknis, upgrade premium, atau kemitraan, hubungi admin melalui kontak WhatsApp di bawah ini.
+             </p>
+             <a 
+               href="https://wa.me/6285777719980" 
+               target="_blank" 
+               rel="noopener noreferrer" 
+               className="w-full flex justify-between items-center p-3 bg-emerald-50 hover:bg-emerald-100 border border-emerald-100 rounded-xl text-[10px] font-black uppercase tracking-widest text-emerald-700 transition-all group"
+             >
+                <span>Kontak Admin</span>
+                <ChevronRight size={14} className="text-emerald-400 group-hover:text-emerald-700" />
+             </a>
+          </div>
 
           <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm flex flex-col gap-4">
              <div className="flex items-center gap-2 mb-2">

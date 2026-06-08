@@ -28,7 +28,7 @@ interface BreedingProps {
 }
 
 export default function Breeding({ profile }: BreedingProps) {
-  const { geckos, pairings, clutches } = useGeckos();
+  const { geckos, pairings, clutches, refreshData } = useGeckos();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isClutchModalOpen, setIsClutchModalOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -108,6 +108,11 @@ export default function Breeding({ profile }: BreedingProps) {
         batch.update(doc(db, 'users', profile.uid), { pairingCount: increment(1) });
       }
       await batch.commit();
+      try {
+        await refreshData();
+      } catch (e) {
+        console.warn("Soft refresh failed after pairing save:", e);
+      }
 
       setIsModalOpen(false);
       setIsEditMode(false);
@@ -141,6 +146,11 @@ export default function Breeding({ profile }: BreedingProps) {
       batch.update(doc(db, 'users', profile.uid), { clutchCount: increment(1) });
       
       await batch.commit();
+      try {
+        await refreshData();
+      } catch (e) {
+        console.warn("Soft refresh failed after clutch save:", e);
+      }
 
       setIsClutchModalOpen(false);
       setClutchData({ clutchNumber: 1, layDate: new Date().toISOString().split('T')[0], eggCount: 2, hatchedCount: 0 });
@@ -156,6 +166,11 @@ export default function Breeding({ profile }: BreedingProps) {
       batch.delete(doc(db, 'pairings', id));
       batch.update(doc(db, 'users', profile.uid), { pairingCount: increment(-1) });
       await batch.commit();
+      try {
+        await refreshData();
+      } catch (e) {
+        console.warn("Soft refresh failed after pairing delete:", e);
+      }
     } catch (error) {
       console.error(error);
     }
@@ -411,7 +426,14 @@ export default function Breeding({ profile }: BreedingProps) {
                                                       isOpen: true,
                                                       title: 'Delete Clutch',
                                                       message: 'Are you sure you want to delete this clutch record?',
-                                                      onConfirm: () => deleteDoc(doc(db, 'clutches', clutch.id!))
+                                                      onConfirm: async () => {
+                                                        try {
+                                                          await deleteDoc(doc(db, 'clutches', clutch.id!));
+                                                          await refreshData();
+                                                        } catch (err) {
+                                                          console.error("Error deleting clutch:", err);
+                                                        }
+                                                      }
                                                     });
                                                   }}
                                                   className="w-11 h-11 flex items-center justify-center text-slate-300 hover:text-red-500 sm:opacity-0 group-hover/item:opacity-100 transition-all rounded-xl border border-transparent hover:border-red-100 hover:bg-red-50"

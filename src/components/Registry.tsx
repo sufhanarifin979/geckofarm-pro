@@ -46,7 +46,7 @@ interface RegistryProps {
 export default function Registry({ profile, setProfile }: RegistryProps) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { geckos, loading } = useGeckos();
+  const { geckos, loading, refreshData } = useGeckos();
   const [search, setSearch] = useState('');
   const [genderFilter, setGenderFilter] = useState('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -268,6 +268,12 @@ export default function Registry({ profile, setProfile }: RegistryProps) {
       await batch.commit();
       console.log('[DEBUG] Firestore data saved');
       
+      try {
+        await refreshData();
+      } catch (e) {
+        console.warn("Soft refresh failed after gecko save:", e);
+      }
+      
       if (!isEditing) {
         setProfile(prev => prev ? { ...prev, geckoCount: prev.geckoCount + 1 } : null);
       }
@@ -331,6 +337,12 @@ export default function Registry({ profile, setProfile }: RegistryProps) {
       batch.delete(doc(db, 'geckos', id));
       batch.update(doc(db, 'users', profile.uid), { geckoCount: increment(-1) });
       await batch.commit();
+      
+      try {
+        await refreshData();
+      } catch (e) {
+        console.warn("Soft refresh failed after gecko delete:", e);
+      }
       
       // Also delete image from storage (best effort)
       await deleteGeckoImage(profile.uid, id);

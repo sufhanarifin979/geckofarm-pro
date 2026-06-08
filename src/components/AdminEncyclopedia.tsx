@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { 
   collection, 
   query, 
-  onSnapshot, 
+  getDocs, 
   doc, 
   addDoc, 
   updateDoc, 
@@ -124,7 +124,7 @@ export default function AdminEncyclopedia() {
     }
 
     const q = query(collection(db, 'morphs'), orderBy('name', 'asc'));
-    const rawUnsubscribe = onSnapshot(q, (snapshot) => {
+    getDocs(q).then((snapshot) => {
       const data = snapshot.docs.map(doc => ({ 
         ...doc.data(),
         id: doc.id
@@ -135,15 +135,12 @@ export default function AdminEncyclopedia() {
       try {
         localStorage.setItem('cache_encyclopedia_morphs', JSON.stringify(data));
       } catch (e) {}
-    }, (error) => {
+    }).catch((error) => {
       handleFirestoreError(error, OperationType.LIST, 'morphs');
       if (!localCacheLoaded) {
         setLoading(false);
       }
     });
-
-    const unsubscribe = registerListener(rawUnsubscribe);
-    return () => unsubscribe();
   }, []);
 
   const slugify = (text: string) => {

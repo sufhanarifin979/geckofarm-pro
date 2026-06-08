@@ -16,7 +16,7 @@ import {
   Info
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { collection, query, onSnapshot, orderBy } from 'firebase/firestore';
+import { collection, query, getDocs, orderBy } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType, registerListener, getCachedMorphs, setCachedMorphs } from '../../lib/firebase';
 import MorphDetail from './MorphDetail';
 import { COMPLETE_MORPH_DATABASE } from './data';
@@ -240,7 +240,7 @@ export default function Encyclopedia() {
     }
 
     const q = query(collection(db, 'morphs'), orderBy('name', 'asc'));
-    const rawUnsubscribe = onSnapshot(q, (snapshot) => {
+    getDocs(q).then((snapshot) => {
       const data = snapshot.docs.map(doc => ({ 
         id: doc.id, 
         ...doc.data() 
@@ -252,16 +252,13 @@ export default function Encyclopedia() {
       try {
         localStorage.setItem('cache_encyclopedia_morphs', JSON.stringify(finalData));
       } catch (e) {}
-    }, (error) => {
-      console.warn("Firestore morphs snapshot error (e.g. quota limit). Falling back to local complete database:", error);
+    }).catch((error) => {
+      console.warn("Firestore morphs query error (e.g. quota limit). Falling back to local complete database:", error);
       if (!localCacheLoaded) {
         setMorphs(COMPLETE_MORPH_DATABASE as unknown as MorphEntry[]);
       }
       setLoading(false);
     });
-
-    const unsubscribe = registerListener(rawUnsubscribe);
-    return () => unsubscribe();
   }, []);
 
   const filteredMorphs = useMemo(() => {
