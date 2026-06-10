@@ -14,7 +14,8 @@ import {
   Camera,
   Layers,
   MapPin,
-  Calendar
+  Calendar,
+  Search
 } from 'lucide-react';
 import { Gecko, UserProfile } from '../types';
 import { db } from '../lib/firebase';
@@ -45,6 +46,13 @@ export default function Export({ profile }: ExportProps) {
   const cardRef = useRef<HTMLDivElement>(null);
   const labelRef = useRef<HTMLDivElement>(null);
   const previewContainerRef = useRef<HTMLDivElement>(null);
+  const [searchTerm, setSearchTerm] = useState<string>('');
+
+  const filteredGeckos = geckos.filter(gecko => {
+    const nameMatch = gecko.name?.toLowerCase().includes(searchTerm.toLowerCase());
+    const morphMatch = gecko.morph?.toLowerCase().includes(searchTerm.toLowerCase());
+    return nameMatch || morphMatch;
+  });
 
   // Calculate scale to fit container while maintaining fixed dimensions
   useEffect(() => {
@@ -546,34 +554,78 @@ export default function Export({ profile }: ExportProps) {
 
         {activeTab === 'general' ? (
           <div className="space-y-6">
-            {/* Dropdown Gecko */}
+            {/* Searchable Gecko Selector */}
             <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm space-y-4">
-              <div className="flex items-center gap-2 px-1">
-                <Camera className="w-4 h-4 text-slate-400" />
-                <h3 className="text-[10px] font-black text-slate-900 uppercase tracking-[0.2em]">Pilih Gecko</h3>
+              <div className="flex items-center justify-between px-1">
+                <div className="flex items-center gap-2">
+                  <Camera className="w-4 h-4 text-slate-400" />
+                  <h3 className="text-[10px] font-black text-slate-900 uppercase tracking-[0.2em]">Pilih Gecko</h3>
+                </div>
+                {selectedGecko && (
+                  <button 
+                    onClick={() => {
+                      setSelectedGecko(null);
+                      setSearchTerm('');
+                    }}
+                    className="text-[10px] font-bold text-red-500 uppercase tracking-wider hover:underline transition-colors"
+                  >
+                    Reset Pilihan
+                  </button>
+                )}
               </div>
+
+              {/* Search Bar Input */}
               <div className="relative">
-                <select 
-                  value={selectedGecko?.id || ''} 
-                  onChange={(e) => {
-                    const g = geckos.find(x => x.id === e.target.value);
-                    setSelectedGecko(g || null);
-                  }}
-                  className="w-full bg-slate-50 border border-slate-100 px-5 py-4 rounded-2xl text-xs font-black uppercase tracking-widest text-slate-700 outline-none focus:ring-2 focus:ring-slate-900/5 transition-all cursor-pointer appearance-none shadow-inner"
-                  style={{ 
-                    backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 24 24\' stroke=\'%2364748b\'%3E%3Cpath stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M19 9l-7 7-7-7\'%3E%3C/path%3E%3C/svg%3E")', 
-                    backgroundRepeat: 'no-repeat', 
-                    backgroundPosition: 'right 1.25rem center', 
-                    backgroundSize: '1rem' 
-                  }}
-                >
-                  <option value="">Pilih Koleksi Anda</option>
-                  {geckos.map(gecko => (
-                    <option key={gecko.id} value={gecko.id}>
-                      {gecko.name} — {gecko.morph}
-                    </option>
-                  ))}
-                </select>
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                  <Search className="h-4 w-4 text-slate-400" />
+                </div>
+                <input
+                  type="text"
+                  placeholder="Cari Nama atau Morph Gecko..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-100 pl-11 pr-4 py-3.5 rounded-2xl text-[11px] font-bold text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-950/5 transition-all shadow-inner"
+                />
+              </div>
+
+              {/* Search results List */}
+              <div className="max-h-56 overflow-y-auto space-y-1.5 pr-1 scrollbar-thin scrollbar-thumb-slate-200">
+                {filteredGeckos.length === 0 ? (
+                  <div className="text-center py-6 text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                    Tidak ada gecko ditemukan
+                  </div>
+                ) : (
+                  filteredGeckos.map((gecko) => {
+                    const isSelected = selectedGecko?.id === gecko.id;
+                    return (
+                      <button
+                        key={gecko.id}
+                        onClick={() => setSelectedGecko(gecko)}
+                        className={cn(
+                          "w-full text-left px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex justify-between items-center group",
+                          isSelected 
+                            ? "bg-slate-900 text-white shadow-md" 
+                            : "bg-slate-50 text-slate-700 hover:bg-slate-100/80 border border-slate-100"
+                        )}
+                      >
+                        <div className="flex flex-col gap-0.5">
+                          <span>{gecko.name}</span>
+                          <span className={cn(
+                            "text-[8px] font-bold tracking-widest",
+                            isSelected ? "text-slate-300" : "text-slate-400"
+                          )}>
+                            {gecko.morph || 'No Morph'}
+                          </span>
+                        </div>
+                        {isSelected ? (
+                          <div className="bg-green-400 rounded-full animate-pulse px-2 py-0.5 text-[8px] font-bold text-green-950 uppercase tracking-widest">Selected</div>
+                        ) : (
+                          <span className="text-[8px] font-bold text-slate-400 group-hover:text-slate-600 transition-colors uppercase tracking-widest hidden sm:inline">Pilih</span>
+                        )}
+                      </button>
+                    );
+                  })
+                )}
               </div>
             </div>
 
