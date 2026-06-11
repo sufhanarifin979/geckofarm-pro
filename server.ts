@@ -131,6 +131,32 @@ PANDUAN GAYA:
     }
   });
 
+  // Save Firestore JSON backup from client run to the workspace filesystem
+  app.post("/api/save-backup", (req, res) => {
+    const backupData = req.body;
+    try {
+      const outputPath = path.join(process.cwd(), 'firestore-backup.json');
+      fs.writeFileSync(outputPath, JSON.stringify(backupData, null, 2), 'utf8');
+      
+      const stats: Record<string, number> = {};
+      for (const col of Object.keys(backupData)) {
+        if (backupData[col] && backupData[col].documents) {
+          stats[col] = Object.keys(backupData[col].documents).length;
+        } else if (Array.isArray(backupData[col])) {
+          stats[col] = backupData[col].length;
+        } else {
+          stats[col] = 0;
+        }
+      }
+
+      console.log(`[Backup Server] Successfully wrote backup file. Size: ${(fs.statSync(outputPath).size / 1024).toFixed(2)} KB. Counts:`, stats);
+      res.json({ success: true, path: outputPath, sizeKb: (fs.statSync(outputPath).size / 1024), counts: stats });
+    } catch (err: any) {
+      console.error("[Backup Server] Error writing backup:", err);
+      res.status(500).json({ error: "Failed to write backup on server", message: err.message });
+    }
+  });
+
   const distPath = path.resolve(__dirname, 'dist');
   
   if (process.env.NODE_ENV !== "production") {
