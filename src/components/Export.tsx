@@ -715,9 +715,9 @@ export default function Export({ profile }: ExportProps) {
         
         await new Promise(resolve => setTimeout(resolve, 80));
         
-        const el = document.getElementById(`label-batch-${id}`);
+        const el = document.getElementById(`batch-label-${id}`);
         if (!el) {
-          console.warn(`Element label-batch-${id} not found.`);
+          console.warn(`Element batch-label-${id} not found.`);
           continue;
         }
 
